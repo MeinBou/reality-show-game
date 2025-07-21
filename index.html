@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reality Show Judge - Multiplayer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.min.js"></script>
+    <style>
+        /* Applicazione degli stili di base e dei font */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+        .font-bangers {
+            font-family: 'Bangers', cursive;
+        }
+        /* Stili personalizzati per i componenti utilizzando le direttive @apply di Tailwind */
+        .btn {
+            @apply px-6 py-3 rounded-lg font-bold text-white shadow-lg transition-transform transform hover:scale-105;
+        }
+        .btn-primary {
+            @apply bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700;
+        }
+        .btn-secondary {
+            @apply bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800;
+        }
+        .btn-danger {
+            @apply bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700;
+        }
+        .card {
+            @apply bg-gray-800 border border-gray-700 rounded-xl shadow-2xl p-6 transition-all;
+        }
+        .contestant-card {
+            @apply bg-gray-700 rounded-lg p-2 flex flex-col items-center justify-between text-center transition-all duration-300 shadow-md hover:shadow-xl hover:border-purple-500 border-2 border-transparent;
+        }
+        .contestant-at-risk {
+            @apply border-red-500 shadow-red-500/50;
+        }
+        .contestant-immune {
+            @apply border-cyan-400 shadow-cyan-400/50;
+        }
+        .contestant-eliminated {
+            @apply opacity-40 grayscale filter;
+        }
+        .team-card {
+            @apply bg-gray-900/50 border-2 rounded-lg p-4;
+        }
+        .team-red { @apply border-red-700; }
+        .team-blue { @apply border-blue-700; }
+        .team-green { @apply border-green-700; }
+
+        /* Animazioni personalizzate */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        @keyframes suspenseReveal {
+            0% { transform: scale(0.8); opacity: 0; }
+            70% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .suspense-reveal {
+            animation: suspenseReveal 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Elemento nascosto per garantire che Tailwind CSS generi le classi dei bordi colorati dinamicamente. -->
+    <div class="hidden border-red-500 border-blue-500 border-green-500"></div>
+
+    <!-- Contenitore principale dell'app -->
+    <div id="app-container" class="w-full max-w-7xl mx-auto">
+
+        <!-- Schermata Iniziale -->
+        <div id="home-screen" class="card text-center">
+            <h1 class="font-bangers text-6xl text-yellow-400 drop-shadow-lg">Reality Show Judge</h1>
+            <p class="mt-2 mb-8 text-lg text-gray-400">Diventa il giudice. Decidi chi vince.</p>
+            
+            <div id="nickname-section" class="max-w-md mx-auto space-y-4">
+                <input type="text" id="nickname-input" placeholder="Il tuo Nickname" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-center focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <button id="confirm-nickname-btn" class="btn btn-primary w-full">Conferma Nickname</button>
+            </div>
+
+            <div id="main-menu-section" class="hidden max-w-md mx-auto space-y-4">
+                <p class="text-xl">Benvenuto, <span id="nickname-display" class="font-bold text-yellow-400"></span>!</p>
+                <button id="create-lobby-btn" class="btn btn-primary w-full">Crea una Nuova Lobby</button>
+                <button id="show-join-code-btn" class="btn btn-secondary w-full">Unisciti con Codice</button>
+                <button id="find-lobbies-btn" class="btn btn-secondary w-full">Cerca Lobby Pubbliche</button>
+            </div>
+
+            <div id="join-code-section" class="hidden max-w-md mx-auto space-y-4 mt-4">
+                <input type="text" id="lobby-code-input" placeholder="Inserisci Codice Lobby" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-center uppercase focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <button id="join-lobby-btn" class="btn btn-secondary w-full">Unisciti</button>
+            </div>
+            <p id="home-error" class="text-red-400 h-4 mt-4"></p>
+        </div>
+        
+        <!-- Schermata Elenco Lobby -->
+        <div id="lobby-list-screen" class="hidden card w-full max-w-2xl">
+            <div class="flex justify-between items-center">
+                <h2 class="text-3xl font-bold text-yellow-400">Lobby Pubbliche</h2>
+                <div class="flex items-center">
+                    <button id="refresh-lobbies-btn" class="btn btn-primary py-2 px-4 mr-2">Aggiorna</button>
+                    <button id="back-to-menu-btn" class="btn btn-secondary py-2 px-4">Indietro</button>
+                </div>
+            </div>
+            <div id="lobby-list-container" class="mt-6 space-y-3"></div>
+        </div>
+
+        <!-- Schermata Lobby (contenuto generato da JS) -->
+        <div id="lobby-screen" class="hidden"></div>
+
+        <!-- Schermata di Gioco (contenuto generato da JS) -->
+        <div id="game-screen" class="hidden"></div>
+
+        <!-- Modale Personalizzazione Concorrenti -->
+        <div id="customization-modal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div class="card w-full max-w-3xl h-full max-h-[90vh] flex flex-col">
+                <h3 class="font-bangers text-4xl text-yellow-400 text-center">Personalizza Concorrenti</h3>
+                <div id="customization-form" class="mt-4 space-y-3 overflow-y-auto flex-grow pr-2">
+                    <!-- Campi di input generati da JS -->
+                </div>
+                <div class="mt-4 flex justify-end space-x-4">
+                    <button id="cancel-customization-btn" class="btn btn-secondary">Annulla</button>
+                    <button id="save-customization-btn" class="btn btn-primary">Salva Personalizzazione</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modale per messaggi generici -->
+        <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div id="modal-content" class="card text-center max-w-lg w-full"></div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // Import delle funzioni necessarie da Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, serverTimestamp, query, where, getDocs, deleteField, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // INCOLLA QUI LA TUA CONFIGURAZIONE FIREBASE
+const firebaseConfig = { 
+    apiKey: "AIzaSyCylKpsbhvkOppxJoInXrP81gC2DOqq2Ao", 
+    authDomain: "total-drama-judge.firebaseapp.com", 
+    projectId: "total-drama-judge", 
+    storageBucket: "total-drama-judge.firebasestorage.app", 
+    messagingSenderId: "807046352867", 
+    appId: "1:807046352867:web:a1c1849ad7b3cd19481ad6", 
+    measurementId: "G-0BR32MRK92" 
+};
+
+// Puoi usare questo ID o sceglierne un altro per il tuo gioco
+const appId = 'my-reality-show-game-v1';
+        
+        // Variabili globali per lo stato dell'app
+        let app, db, auth, userId, lobbyUnsubscribe;
+        let currentLobbyId = null;
+        let timerInterval = null;
+        let isHost = false;
+        let currentNickname = '';
+        
+        // Riferimenti agli elementi del DOM
+        const homeScreen = document.getElementById('home-screen');
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const lobbyListScreen = document.getElementById('lobby-list-screen');
+        const customizationModal = document.getElementById('customization-modal');
+        
+        const nicknameSection = document.getElementById('nickname-section');
+        const mainMenuSection = document.getElementById('main-menu-section');
+        const joinCodeSection = document.getElementById('join-code-section');
+
+        const confirmNicknameBtn = document.getElementById('confirm-nickname-btn');
+        const createLobbyBtn = document.getElementById('create-lobby-btn');
+        const showJoinCodeBtn = document.getElementById('show-join-code-btn');
+        const findLobbiesBtn = document.getElementById('find-lobbies-btn');
+        const joinLobbyBtn = document.getElementById('join-lobby-btn');
+        const backToMenuBtn = document.getElementById('back-to-menu-btn');
+        const refreshLobbiesBtn = document.getElementById('refresh-lobbies-btn');
+        const saveCustomizationBtn = document.getElementById('save-customization-btn');
+        const cancelCustomizationBtn = document.getElementById('cancel-customization-btn');
+        
+        const nicknameInput = document.getElementById('nickname-input');
+        const nicknameDisplay = document.getElementById('nickname-display');
+        const lobbyCodeInput = document.getElementById('lobby-code-input');
+        const homeError = document.getElementById('home-error');
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modal-content');
+
+        // Funzione di inizializzazione di Firebase
+        async function initialize() {
+            if (Object.keys(firebaseConfig).length === 0) {
+                showError("Configurazione Firebase non trovata. L'app non può funzionare in multiplayer.");
+                return;
+            }
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // Gestisce lo stato di autenticazione dell'utente
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                } else {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Errore di autenticazione:", error);
+                        showError("Impossibile autenticare l'utente.");
+                    }
+                }
+            });
+        }
+
+        // Crea una nuova lobby nel database
+        const createLobby = async () => {
+            const nickname = currentNickname;
+            if (!nickname) return;
+
+            const lobbyId = generateLobbyCode();
+            currentLobbyId = lobbyId;
+            isHost = true;
+            
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, lobbyId);
+
+            const initialLobbyData = {
+                hostId: userId,
+                hostNickname: nickname,
+                players: { [userId]: { nickname, hasVoted: false } },
+                gameState: 'LOBBY',
+                gameMode: 'standard',
+                config: { numContestants: 16, numTeams: 2 },
+                customContestants: [],
+                createdAt: serverTimestamp()
+            };
+
+            try {
+                await setDoc(lobbyRef, initialLobbyData);
+                joinLobby(lobbyId);
+            } catch (error) {
+                console.error("Errore creazione lobby:", error);
+                showError("Impossibile creare la lobby.");
+                isHost = false;
+                currentLobbyId = null;
+            }
+        };
+        
+        // Tenta di unirsi a una lobby esistente
+        const attemptToJoinLobby = async (lobbyId) => {
+            const nickname = currentNickname;
+            if (!nickname || !lobbyId) {
+                showError("Nickname o codice lobby mancante.");
+                return;
+            }
+
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, lobbyId);
+            try {
+                const lobbySnap = await getDoc(lobbyRef);
+                if (lobbySnap.exists() && lobbySnap.data().gameState === 'LOBBY') {
+                    currentLobbyId = lobbyId;
+                    await updateDoc(lobbyRef, {
+                        [`players.${userId}`]: { nickname, hasVoted: false }
+                    });
+                    joinLobby(lobbyId);
+                } else {
+                    showError("Lobby non trovata o già iniziata.");
+                }
+            } catch (error) {
+                console.error("Errore unione lobby:", error);
+                showError("Impossibile unirsi alla lobby.");
+            }
+        };
+
+        // Gestisce l'ingresso in una lobby e si sottoscrive agli aggiornamenti
+        const joinLobby = (lobbyId) => {
+            [homeScreen, lobbyListScreen].forEach(el => el.classList.add('hidden'));
+            [lobbyScreen, gameScreen].forEach(el => el.classList.remove('hidden'));
+            gameScreen.classList.add('hidden');
+
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, lobbyId);
+            if (lobbyUnsubscribe) lobbyUnsubscribe();
+            
+            lobbyUnsubscribe = onSnapshot(lobbyRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    handleGameStateUpdate(docSnap.data());
+                } else {
+                    showModalMessage("Lobby Chiusa", "La lobby a cui eri connesso è stata chiusa dall'host.", true);
+                    returnToMenu();
+                }
+            });
+        };
+
+        // Torna al menu principale
+        const returnToMenu = () => {
+            if (lobbyUnsubscribe) lobbyUnsubscribe();
+            lobbyUnsubscribe = null;
+            currentLobbyId = null;
+            isHost = false;
+            homeScreen.classList.remove('hidden');
+            nicknameSection.classList.add('hidden');
+            mainMenuSection.classList.remove('hidden');
+            joinCodeSection.classList.add('hidden');
+            [lobbyScreen, gameScreen, lobbyListScreen].forEach(el => el.classList.add('hidden'));
+            lobbyCodeInput.value = '';
+        };
+        
+        // Abbandona la lobby corrente. Se l'host esce, la lobby viene cancellata.
+        const leaveLobby = async () => {
+            if (!currentLobbyId) return;
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            
+            if (isHost) {
+                // Se l'host esce, cancella la lobby per tutti.
+                await deleteDoc(lobbyRef).catch(err => console.error("Impossibile cancellare la lobby:", err));
+            } else {
+                // Se un giocatore normale esce, rimuove solo se stesso.
+                await updateDoc(lobbyRef, { [`players.${userId}`]: deleteField() })
+                  .catch(err => console.error("Impossibile rimuovere il giocatore:", err));
+            }
+            
+            returnToMenu();
+        };
+        
+        // Carica e visualizza l'elenco delle lobby pubbliche
+        const fetchAndRenderLobbies = async () => {
+            homeScreen.classList.add('hidden');
+            lobbyListScreen.classList.remove('hidden');
+            const container = document.getElementById('lobby-list-container');
+            container.innerHTML = '<p class="text-center text-gray-400">Caricamento lobby...</p>';
+
+            try {
+                const lobbiesRef = collection(db, `artifacts/${appId}/public/data/lobbies`);
+                const q = query(lobbiesRef, where("gameState", "==", "LOBBY"));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    container.innerHTML = '<p class="text-center text-gray-400">Nessuna lobby pubblica trovata. Creane una tu!</p>';
+                    return;
+                }
+
+                const lobbies = [];
+                querySnapshot.forEach(doc => lobbies.push({ id: doc.id, ...doc.data() }));
+                lobbies.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+                container.innerHTML = lobbies.map(lobby => {
+                    const playerCount = Object.keys(lobby.players).length;
+                    return `
+                        <div class="bg-gray-700 p-4 rounded-lg flex justify-between items-center fade-in">
+                            <div>
+                                <p class="font-bold text-lg text-purple-400">Lobby di ${lobby.hostNickname}</p>
+                                <p class="text-sm text-gray-300">${playerCount} Giudici connessi</p>
+                            </div>
+                            <button data-lobby-id="${lobby.id}" class="btn btn-primary py-2 px-4 join-from-list-btn">Unisciti</button>
+                        </div>`;
+                }).join('');
+
+                document.querySelectorAll('.join-from-list-btn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        playSound('click');
+                        attemptToJoinLobby(button.dataset.lobbyId);
+                    });
+                });
+
+            } catch (error) {
+                console.error("Errore nel caricare le lobby:", error);
+                container.innerHTML = `<p class="text-center text-red-400">Impossibile caricare le lobby. Riprova.</p>`;
+            }
+        };
+
+        // Gestisce gli aggiornamenti dello stato del gioco e chiama la funzione di rendering appropriata
+        const handleGameStateUpdate = (data) => {
+            const states = {
+                'LOBBY': renderLobbyScreen,
+                'GAME_STARTING': renderGameStarting,
+                'CHALLENGE_RESULT': renderGameScreen,
+                'VOTING': renderGameScreen,
+                'ELIMINATION_CEREMONY': renderGameScreen,
+                'TIEBREAKER': renderGameScreen,
+                'VOTE_SUMMARY': renderGameScreen,
+                'FINALE_VOTE': renderGameScreen,
+                'GAME_OVER': renderGameScreen,
+            };
+            if (states[data.gameState]) {
+                states[data.gameState](data);
+                // Se lo stato è ELIMINATION_CEREMONY e l'utente è l'host, avvia la sequenza di eliminazione
+                if (data.gameState === 'ELIMINATION_CEREMONY' && isHost) {
+                    runEliminationSequence(data);
+                }
+            } else {
+                console.warn("Stato del gioco non riconosciuto:", data.gameState);
+            }
+        };
+
+        // Avvia il gioco
+        const startGame = async () => {
+            playSound('confirm');
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            const lobbySnap = await getDoc(lobbyRef);
+            const lobbyData = lobbySnap.data();
+
+            const contestants = generateContestants(lobbyData.config, lobbyData.customContestants);
+
+            await updateDoc(lobbyRef, {
+                gameState: 'GAME_STARTING',
+                contestants: contestants,
+                currentEpisode: 1,
+                log: ["Il gioco sta per iniziare!"]
+            });
+        };
+
+        // Funzione generica per far avanzare lo stato del gioco
+        const advanceGameState = async (newState, extraData = {}) => {
+            playSound('transition');
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            await updateDoc(lobbyRef, { gameState: newState, ...extraData });
+        };
+        
+        // Funzioni per inviare i voti al database
+        const castVote = async (contestantId) => {
+            playSound('vote');
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            await updateDoc(lobbyRef, {
+                [`votes.${userId}`]: contestantId,
+                [`players.${userId}.hasVoted`]: true
+            });
+        };
+        
+        const castRankingVote = async (ranking) => {
+            playSound('vote');
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            await updateDoc(lobbyRef, {
+                [`rankings.${userId}`]: ranking,
+                [`players.${userId}.hasVoted`]: true
+            });
+        };
+        
+        const castTiebreakerVote = async (contestantId) => {
+            playSound('vote');
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            await updateDoc(lobbyRef, {
+                [`tiebreaker.votes.${userId}`]: contestantId,
+                [`players.${userId}.hasVoted`]: true
+            });
+        };
+        
+        const castFinaleVote = async (contestantId) => {
+             playSound('vote');
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            await updateDoc(lobbyRef, {
+                [`finaleVotes.${userId}`]: contestantId,
+                [`players.${userId}.hasVoted`]: true
+            });
+        }
+
+        // --- FUNZIONI DI RENDERING ---
+
+        // Renderizza la schermata della lobby
+        const renderLobbyScreen = (data) => {
+            const players = Object.values(data.players).map(p => p.nickname).join(', ');
+            const isHostView = data.hostId === userId;
+
+            let configHtml = '';
+            if (isHostView) {
+                const isStandard = data.gameMode === 'standard';
+                const isSurprise = data.gameMode === 'surprise';
+                configHtml = `
+                    <div class="mt-8 space-y-4 text-left max-w-lg mx-auto">
+                        <h3 class="text-2xl font-bold text-center text-yellow-400">Impostazioni</h3>
+                        <div>
+                            <label class="block mb-2 font-bold">Modalità di Gioco:</label>
+                            <div class="flex space-x-2">
+                                <button onclick="window.updateConfig('gameMode', 'standard')" class="flex-1 btn ${isStandard ? 'btn-primary' : 'btn-secondary'}">Standard Reality</button>
+                                <button onclick="window.updateConfig('gameMode', 'surprise')" class="flex-1 btn ${isSurprise ? 'btn-primary' : 'btn-secondary'}">Eliminazione a Sorpresa</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block mb-2 font-bold">Numero Concorrenti:</label>
+                            <input type="range" id="numContestants" min="${isStandard ? 16 : 12}" max="${isStandard ? 30 : 18}" value="${data.config.numContestants}" onchange="this.nextElementSibling.textContent = this.value; window.updateConfig('config.numContestants', this.value)" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                            <span class="text-center block mt-1">${data.config.numContestants}</span>
+                        </div>
+                        ${isStandard ? `
+                        <div>
+                            <label class="block mb-2 font-bold">Numero Squadre:</label>
+                            <div class="flex space-x-2">
+                                <button onclick="window.updateConfig('config.numTeams', 2)" class="flex-1 btn ${data.config.numTeams === 2 ? 'btn-primary' : 'btn-secondary'}">2 Squadre</button>
+                                <button onclick="window.updateConfig('config.numTeams', 3)" class="flex-1 btn ${data.config.numTeams === 3 ? 'btn-primary' : 'btn-secondary'}">3 Squadre</button>
+                            </div>
+                        </div>` : ''}
+                    </div>
+                    <div class="mt-6 flex flex-col sm:flex-row justify-center items-center gap-4 max-w-md mx-auto">
+                        <button id="customize-contestants-btn" class="btn btn-secondary w-full sm:w-auto">Personalizza Concorrenti</button>
+                        <button id="start-game-btn" class="btn btn-primary w-full sm:w-auto flex-grow">Avvia Gioco</button>
+                    </div>
+                `;
+            }
+
+            lobbyScreen.innerHTML = `
+                <div class="card text-center fade-in">
+                    <div class="flex justify-between items-start">
+                        <h2 class="text-3xl font-bold">Lobby: <span class="font-bangers text-5xl text-yellow-400 tracking-widest">${currentLobbyId}</span></h2>
+                        <button id="leave-lobby-btn" class="btn btn-danger py-2 px-4">Esci</button>
+                    </div>
+                    <p class="mt-2 text-gray-400">Condividi questo codice o cercate la lobby nella lista pubblica.</p>
+                    <div class="mt-6 bg-gray-900 p-4 rounded-lg">
+                        <h3 class="text-xl font-bold text-purple-400">Giudici Connessi:</h3>
+                        <p class="text-lg mt-2">${players}</p>
+                    </div>
+                    ${configHtml}
+                    ${!isHostView ? '<p class="mt-8 text-xl italic text-gray-400">In attesa che l\'host avvii il gioco...</p>' : ''}
+                </div>
+            `;
+            
+            if (isHostView) {
+                document.getElementById('start-game-btn').addEventListener('click', startGame);
+                document.getElementById('customize-contestants-btn').addEventListener('click', () => openCustomizationModal(data));
+            }
+            document.getElementById('leave-lobby-btn').addEventListener('click', () => { playSound('click'); leaveLobby(); });
+        };
+        
+        // Renderizza la schermata di avvio del gioco
+        const renderGameStarting = (data) => {
+            gameScreen.innerHTML = `
+                <div class="card text-center fade-in">
+                    <h1 class="font-bangers text-7xl text-yellow-400">Il Gioco Inizia!</h1>
+                    <p class="text-2xl mt-4">Preparatevi, giudici!</p>
+                    <div class="mt-8 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                        ${data.contestants.map(c => `
+                            <div class="contestant-card team-${c.team}" style="animation: suspenseReveal 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards; animation-delay: ${c.id * 50}ms">
+                                <img src="${c.pngUrl || `https://placehold.co/80x80/2d3748/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/80x80/2d3748/e2e8f0?text=${c.name.charAt(0)}'" class="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-gray-500 object-cover">
+                                <p class="font-bold truncate">${c.name}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            if(isHost) {
+                setTimeout(() => {
+                    if (data.gameMode === 'standard') {
+                        runStandardChallenge(data);
+                    } else {
+                        runSurpriseRiskSelection(data);
+                    }
+                }, (data.contestants.length * 50) + 3000);
+            }
+        };
+
+        // Renderizza la schermata di gioco principale, delegando al renderer di stato specifico
+        const renderGameScreen = (data) => {
+            lobbyScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+            
+            const states = {
+                'CHALLENGE_RESULT': renderChallengeResult,
+                'VOTING': renderVoting,
+                'ELIMINATION_CEREMONY': renderEliminationCeremony,
+                'VOTE_SUMMARY': renderVoteSummary,
+                'TIEBREAKER': renderTiebreaker,
+                'FINALE_VOTE': renderFinale,
+                'GAME_OVER': renderGameOver,
+            };
+            
+            const mainContent = states[data.gameState] ? states[data.gameState](data) : '';
+            const showHeader = !['VOTE_SUMMARY', 'GAME_OVER'].includes(data.gameState);
+            
+            gameScreen.innerHTML = `
+                <div class="fade-in">
+                    ${showHeader ? `
+                    <div class="flex justify-between items-center mb-4 bg-gray-900 p-3 rounded-lg">
+                        <h2 class="text-2xl font-bold">Episodio ${data.currentEpisode}</h2>
+                        <div id="timer" class="font-bangers text-4xl text-yellow-400"></div>
+                    </div>` : ''}
+                    ${mainContent}
+                </div>
+            `;
+            
+            if (data.gameState === 'VOTING' || data.gameState === 'TIEBREAKER' || data.gameState === 'FINALE_VOTE') {
+                setupTimer(data.timerEndTime);
+            }
+            
+            // Aggiunge gli event listener necessari per la schermata corrente
+            document.querySelectorAll('[data-vote-id]').forEach(b => b.addEventListener('click', () => castVote(b.dataset.voteId)));
+            document.querySelectorAll('[data-tiebreak-id]').forEach(b => b.addEventListener('click', () => castTiebreakerVote(b.dataset.tiebreakId)));
+            document.querySelectorAll('[data-finale-id]').forEach(b => b.addEventListener('click', () => castFinaleVote(b.dataset.finaleId)));
+            
+            const confirmRankingBtn = document.getElementById('confirm-ranking-btn');
+            if (confirmRankingBtn) {
+                confirmRankingBtn.addEventListener('click', () => {
+                    const ranking = {};
+                    const ranks = new Set();
+                    let isValid = true;
+                    let hasEmpty = false;
+                    const numAtRisk = document.querySelectorAll('.ranking-input').length;
+
+                    document.querySelectorAll('.ranking-input').forEach(input => {
+                        const rank = parseInt(input.value);
+                        if (isNaN(rank)) hasEmpty = true;
+                        if (ranks.has(rank) || rank < 1 || rank > numAtRisk) isValid = false;
+                        ranks.add(rank);
+                        ranking[input.dataset.contestantId] = rank;
+                    });
+                    
+                    if (hasEmpty) {
+                        showModalMessage("Errore", "Devi assegnare una posizione a ogni concorrente.", false, 3000);
+                        return;
+                    }
+                    if (!isValid || ranks.size !== numAtRisk) {
+                        showModalMessage("Errore", "Ogni concorrente deve avere una posizione diversa e valida.", false, 3000);
+                        return;
+                    }
+                    castRankingVote(ranking);
+                });
+            }
+            
+            const nextEpBtn = document.getElementById('next-episode-btn');
+            if(nextEpBtn) {
+                nextEpBtn.addEventListener('click', async () => {
+                    const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+                    const lobbySnap = await getDoc(lobbyRef);
+                    if (lobbySnap.exists()) prepareNextEpisode(lobbySnap.data());
+                });
+            }
+        };
+        
+        // Renderizza il risultato della sfida
+        const renderChallengeResult = (data) => {
+            const logMessage = data.log[data.log.length - 1] || "La sfida si è conclusa.";
+            if (isHost) {
+                 setTimeout(() => {
+                    if (data.gameMode === 'standard') startStandardVoting(data);
+                    else startSurpriseVoting(data);
+                }, 5000);
+            }
+            return `
+                <div class="card text-center">
+                    <h3 class="text-3xl font-bold text-purple-400">Risultato Sfida</h3>
+                    <p class="text-xl mt-4">${logMessage}</p>
+                    <p class="text-lg mt-8 italic">La votazione inizierà a breve...</p>
+                    ${renderTeamDisplay(data)}
+                </div>
+            `;
+        };
+
+        // Renderizza la schermata di votazione
+        const renderVoting = (data) => {
+            const hasVoted = data.players[userId]?.hasVoted || false;
+            let votingContent = '';
+
+            // LOGICA CONFERMATA: Solo i concorrenti a rischio (del team perdente) vengono mostrati per la votazione.
+            if (data.gameMode === 'standard') {
+                const myVote = data.votes ? data.votes[userId] : null;
+                const atRiskContestants = data.contestants.filter(c => c.isAtRisk && c.status === 'active');
+                votingContent = `
+                    <h3 class="text-3xl font-bold text-red-500">Votazione!</h3>
+                    <p class="text-lg mt-2">Vota per eliminare uno dei concorrenti dal team perdente.</p>
+                    <div class="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        ${atRiskContestants.map(c => `
+                            <div class="contestant-card contestant-at-risk">
+                                <img src="${c.pngUrl || `https://placehold.co/80x80/c53030/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/80x80/c53030/e2e8f0?text=${c.name.charAt(0)}'" class="w-20 h-20 rounded-full mb-2 object-cover">
+                                <p class="font-bold text-lg">${c.name}</p>
+                                <button ${hasVoted ? 'disabled' : ''} data-vote-id="${c.id}" class="mt-2 btn ${myVote == c.id ? 'btn-primary' : 'btn-danger'} w-full text-sm py-2">${myVote == c.id ? 'Votato' : 'Vota Elimina'}</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else { // Modalità Sorpresa
+                const atRiskContestants = data.contestants.filter(c => c.isAtRisk && c.status === 'active');
+                const ranks = Array.from({ length: atRiskContestants.length }, (_, i) => i + 1);
+                const voteTypeMessage = data.voteType === 'save' 
+                    ? 'Classifica per SALVARE. Il primo in classifica è il più sicuro.' 
+                    : 'Classifica per ELIMINARE. Il primo in classifica è il più a rischio.';
+                const titleColor = data.voteType === 'save' ? 'text-green-400' : 'text-red-500';
+
+                // MODIFICA: Aggiunta l'immagine del concorrente nella lista di classifica
+                votingContent = `
+                    <h3 class="text-3xl font-bold ${titleColor}">Classifica i Concorrenti!</h3>
+                    <p class="text-lg mt-2">${voteTypeMessage}</p>
+                    <div class="mt-6 space-y-3 max-w-lg mx-auto">
+                        ${atRiskContestants.map(c => `
+                            <div class="flex items-center justify-between bg-gray-700 p-2 rounded-lg">
+                                <div class="flex items-center space-x-4">
+                                    <img src="${c.pngUrl || `https://placehold.co/60x60/4a5568/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/60x60/4a5568/e2e8f0?text=${c.name.charAt(0)}'" class="w-12 h-12 rounded-full object-cover">
+                                    <p class="font-bold text-lg">${c.name}</p>
+                                </div>
+                                <select ${hasVoted ? 'disabled' : ''} data-contestant-id="${c.id}" class="ranking-input bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    <option value="" selected disabled>Posizione</option>
+                                    ${ranks.map(r => `<option value="${r}">${r}° Posto</option>`).join('')}
+                                </select>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button id="confirm-ranking-btn" ${hasVoted ? 'disabled' : ''} class="mt-6 btn btn-primary">${hasVoted ? 'Classifica Inviata' : 'Conferma Classifica'}</button>
+                `;
+            }
+
+            const voters = Object.values(data.players).filter(p => p.hasVoted).map(p => p.nickname).join(', ');
+            return `
+                <div class="card">
+                    ${votingContent}
+                    <div class="mt-8 text-center">
+                        <h4 class="font-bold text-purple-400">Giudici che hanno votato:</h4>
+                        <p>${voters || 'Nessuno ancora'}</p>
+                    </div>
+                </div>
+            `;
+        };
+        
+        // Renderizza la cerimonia di eliminazione
+        const renderEliminationCeremony = (data) => {
+            const atRiskContestants = data.contestants.filter(c => data.gameMode === 'standard' ? c.isAtRisk : c.wasAtRisk).filter(c => c.status === 'active');
+            return `
+                <div id="ceremony-container" class="card text-center">
+                    <h3 class="font-bangers text-6xl text-red-500">Cerimonia di Eliminazione</h3>
+                    <p class="text-xl mt-2">Uno di voi lascerà il gioco... per sempre.</p>
+                    <div id="ceremony-contestants" class="mt-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        ${atRiskContestants.map(c => `
+                            <div id="ceremony-contestant-${c.id}" class="contestant-card contestant-at-risk">
+                                <img src="${c.pngUrl || `https://placehold.co/80x80/c53030/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/80x80/c53030/e2e8f0?text=${c.name.charAt(0)}'" class="w-20 h-20 rounded-full mx-auto mb-2 object-cover">
+                                <p class="font-bold text-xl">${c.name}</p>
+                                <div id="ceremony-status-${c.id}" class="h-6 mt-2"></div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div id="ceremony-buttons" class="mt-8 h-12"></div>
+                </div>
+            `;
+        };
+        
+        // Renderizza il riepilogo della votazione (solo per modalità sorpresa)
+        const renderVoteSummary = (data) => {
+            const eliminatedContestant = data.contestants.find(c => c.id === data.eliminatedId);
+            const atRiskContestants = data.contestants.filter(c => c.wasAtRisk);
+            const scoreTotals = data.scoreTotals;
+            const finalRankings = data.finalRankings;
+
+            const sortedByScore = [...atRiskContestants].sort((a, b) => scoreTotals[b.id] - scoreTotals[a.id]);
+
+            return `
+                <div class="card text-center">
+                    <h3 class="font-bangers text-5xl text-yellow-400">Riepilogo Votazione</h3>
+                    <p class="text-xl mt-2">Con ${scoreTotals[eliminatedContestant.id]} punti, <span class="font-bold text-red-400">${eliminatedContestant.name}</span> è stato eliminato.</p>
+                    <div class="my-6">
+                        <h4 class="text-2xl font-bold text-purple-400 mb-3">Classifica Finale Punti</h4>
+                        <div class="space-y-2 max-w-md mx-auto">
+                        ${sortedByScore.map(c => `
+                            <div class="flex justify-between items-center bg-gray-900 p-2 rounded-lg ${c.id === eliminatedContestant.id ? 'opacity-50' : ''}">
+                                <span class="font-bold">${c.name}</span>
+                                <span class="font-bold text-yellow-400">${scoreTotals[c.id]} Punti</span>
+                            </div>
+                        `).join('')}
+                        </div>
+                    </div>
+                    <div class="my-6">
+                        <h4 class="text-2xl font-bold text-purple-400 mb-3">Voti dei Giudici</h4>
+                        <div class="space-y-4 max-w-lg mx-auto text-left">
+                        ${Object.keys(finalRankings).map(pId => {
+                            const playerNickname = data.players[pId].nickname;
+                            const playerRanking = finalRankings[pId];
+                            const sortedPlayerRanking = Object.entries(playerRanking).sort((a, b) => a[1] - b[1]);
+                            return `
+                                <div class="bg-gray-700 p-3 rounded-lg">
+                                    <p class="font-bold text-lg">${playerNickname} ha votato:</p>
+                                    <ol class="list-decimal list-inside mt-1">
+                                        ${sortedPlayerRanking.map(([cId, rank]) => `<li>${data.contestants.find(c => c.id == cId).name}</li>`).join('')}
+                                    </ol>
+                                </div>
+                            `;
+                        }).join('')}
+                        </div>
+                    </div>
+                    ${isHost ? `<button id="next-episode-btn" class="btn btn-primary mt-4">Prossimo Episodio</button>` : `<p class="mt-8 text-xl italic text-gray-400">In attesa che l'host continui...</p>`}
+                </div>
+            `;
+        };
+
+        // Renderizza la votazione di spareggio
+        const renderTiebreaker = (data) => {
+            const hasVoted = data.players[userId]?.hasVoted || false;
+            const tieContestants = data.contestants.filter(c => data.tiebreaker.contestants.includes(c.id));
+            const myVote = data.tiebreaker.votes ? data.tiebreaker.votes[userId] : null;
+            
+            return `
+                <div class="card text-center">
+                    <h3 class="text-3xl font-bold text-yellow-500">PAREGGIO!</h3>
+                    <p class="text-lg mt-2">C'è un pareggio. Ora dovete votare chi volete SALVARE.</p>
+                    <div class="mt-6 grid grid-cols-2 gap-4">
+                        ${tieContestants.map(c => `
+                             <div class="contestant-card contestant-at-risk">
+                                 <img src="${c.pngUrl || `https://placehold.co/80x80/c53030/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/80x80/c53030/e2e8f0?text=${c.name.charAt(0)}'" class="w-16 h-16 rounded-full mx-auto mb-2 object-cover">
+                                 <p class="font-bold">${c.name}</p>
+                                 <button ${hasVoted ? 'disabled' : ''} data-tiebreak-id="${c.id}" class="mt-2 btn ${myVote == c.id ? 'btn-primary' : 'btn-secondary'} w-full text-sm py-2">${myVote == c.id ? 'Votato' : 'Vota Salva'}</button>
+                             </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        };
+        
+        // Renderizza la votazione finale
+        const renderFinale = (data) => {
+            const finalists = data.contestants.filter(c => c.status === 'active');
+            const hasVoted = data.players[userId]?.hasVoted || false;
+            const myVote = data.finaleVotes ? data.finaleVotes[userId] : null;
+
+            return `
+                <div class="card text-center">
+                    <h3 class="font-bangers text-7xl text-yellow-400">LA FINALE!</h3>
+                    <p class="text-2xl mt-2">Solo uno può vincere. Votate il vostro campione!</p>
+                    <div class="mt-8 grid grid-cols-1 md:grid-cols-${finalists.length} gap-8">
+                        ${finalists.map(c => `
+                            <div class="contestant-card border-4 border-yellow-400">
+                                <img src="${c.pngUrl || `https://placehold.co/120x120/a0aec0/1a202c?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/120x120/a0aec0/1a202c?text=${c.name.charAt(0)}'" class="w-28 h-28 rounded-full mx-auto mb-4 object-cover">
+                                <p class="font-bold text-3xl">${c.name}</p>
+                                <button ${hasVoted ? 'disabled' : ''} data-finale-id="${c.id}" class="mt-4 btn ${myVote == c.id ? 'btn-primary' : 'btn-secondary'} w-full text-lg py-3">${myVote == c.id ? 'Votato' : 'Vota Vincitore'}</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        };
+
+        // Renderizza la schermata di fine gioco
+        const renderGameOver = (data) => {
+            const winner = data.contestants.find(c => c.id === data.winnerId);
+            return `
+                <div class="card text-center">
+                    <h3 class="font-bangers text-6xl text-gray-400">GIOCO FINITO</h3>
+                    <p class="text-2xl mt-4">E il vincitore è...</p>
+                    <div class="my-8">
+                        <div class="inline-block contestant-card border-4 border-yellow-400 p-8 suspense-reveal">
+                            <img src="${winner.pngUrl || `https://placehold.co/150x150/ecc94b/1a202c?text=${winner.name.charAt(0)}`}" onerror="this.src='https://placehold.co/150x150/ecc94b/1a202c?text=${winner.name.charAt(0)}'" class="w-36 h-36 rounded-full mx-auto mb-4 object-cover">
+                            <p class="font-bangers text-7xl text-yellow-300">${winner.name}</p>
+                        </div>
+                    </div>
+                    ${isHost ? `<button onclick="window.location.reload()" class="btn btn-primary">Torna al Menu Principale</button>` : '<p class="mt-8 text-xl italic text-gray-400">Grazie per aver giocato! L\'host può riavviare.</p>'}
+                </div>
+            `;
+        };
+
+        // Renderizza la visualizzazione delle squadre
+        const renderTeamDisplay = (data) => {
+            if (data.gameMode !== 'standard') return '';
+            const teams = { red: [], blue: [], green: [] };
+            data.contestants.forEach(c => {
+                if (c.status === 'active' && teams[c.team]) {
+                    teams[c.team].push(c);
+                }
+            });
+
+            return `
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-${data.config.numTeams} gap-4">
+                ${Object.entries(teams).filter(([_, members]) => members.length > 0).map(([teamColor, members]) => `
+                    <div class="team-card team-${teamColor}">
+                        <h4 class="font-bangers text-3xl text-center capitalize text-${teamColor}-400">${teamColor} Team</h4>
+                        <div class="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            ${members.map(c => {
+                                let classes = '';
+                                if (c.isImmune) classes += ' contestant-immune';
+                                if (c.isAtRisk) classes += ' contestant-at-risk';
+                                // BUG FIX: La classe del colore del bordo viene aggiunta dinamicamente.
+                                // Le classi complete sono state inserite in un div nascosto per garantire che Tailwind le generi.
+                                return `
+                                <div class="contestant-card p-1 ${classes}">
+                                    <img src="${c.pngUrl || `https://placehold.co/60x60/4a5568/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/60x60/4a5568/e2e8f0?text=${c.name.charAt(0)}'" class="w-12 h-12 rounded-full mx-auto mb-1 border-4 border-${c.team}-500 object-cover">
+                                    <p class="font-bold text-xs truncate">${c.name}</p>
+                                </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            `;
+        };
+        
+        // Apre la modale per personalizzare i concorrenti
+        const openCustomizationModal = (data) => {
+            const form = document.getElementById('customization-form');
+            const num = data.config.numContestants;
+            const customs = data.customContestants || [];
+            form.innerHTML = Array.from({ length: num }, (_, i) => {
+                const custom = customs.find(c => c.id === i) || {};
+                return `
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center bg-gray-700 p-2 rounded-lg">
+                    <label class="font-bold">Concorrente ${i + 1}</label>
+                    <input type="text" data-id="${i}" data-field="name" value="${custom.name || ''}" placeholder="Nome" class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <input type="text" data-id="${i}" data-field="pngUrl" value="${custom.pngUrl || ''}" placeholder="URL Immagine PNG" class="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+                `;
+            }).join('');
+            customizationModal.classList.remove('hidden');
+        };
+
+        // Salva i nomi personalizzati dei concorrenti
+        const saveCustomization = async () => {
+            const customContestants = [];
+            document.querySelectorAll('#customization-form input[data-id]').forEach(input => {
+                const id = parseInt(input.dataset.id);
+                const field = input.dataset.field;
+                const value = input.value.trim();
+                if (value) {
+                    let contestant = customContestants.find(c => c.id === id);
+                    if (!contestant) {
+                        contestant = { id };
+                        customContestants.push(contestant);
+                    }
+                    contestant[field] = value;
+                }
+            });
+            
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            await updateDoc(lobbyRef, { customContestants: customContestants.filter(c => c.name || c.pngUrl) });
+            customizationModal.classList.add('hidden');
+            playSound('confirm');
+        };
+
+        // --- LOGICA DELL'HOST (esecuzione del gioco) ---
+        
+        // Simula una sfida nella modalità standard
+        const runStandardChallenge = async (data) => {
+            const activeContestants = data.contestants.filter(c => c.status === 'active');
+            const teams = [...new Set(activeContestants.map(c => c.team))];
+            
+            const winningTeams = [];
+            const losingTeams = [];
+            if (teams.length > 1) {
+                const winnerIndex = Math.floor(Math.random() * teams.length);
+                winningTeams.push(teams[winnerIndex]);
+                teams.forEach((t, i) => { if (i !== winnerIndex) losingTeams.push(t); });
+            } else { 
+                winningTeams.push(teams[0]);
+            }
+            
+            // LOGICA CONFERMATA: Solo i membri dei team perdenti sono a rischio. I vincitori sono immuni.
+            const newContestants = data.contestants.map(c => ({
+                ...c,
+                isImmune: winningTeams.includes(c.team),
+                isAtRisk: losingTeams.includes(c.team)
+            }));
+            
+            const logMessage = `La squadra ${winningTeams.join(', ')} vince l'immunità! La squadra ${losingTeams.join(', ')} è a rischio.`;
+            await advanceGameState('CHALLENGE_RESULT', { contestants: newContestants, log: [...data.log, logMessage] });
+        };
+        
+        // Avvia la votazione per la modalità standard
+        const startStandardVoting = async (data) => {
+            const timerEndTime = Date.now() + 30000;
+            await advanceGameState('VOTING', {
+                timerEndTime,
+                votes: {},
+                players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
+            });
+            setTimeout(processStandardVotes, 31000);
+        };
+        
+        // Elabora i voti della modalità standard
+        const processStandardVotes = async () => {
+            if (!isHost) return;
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            const lobbySnap = await getDoc(lobbyRef);
+            const data = lobbySnap.data();
+
+            if (data.gameState !== 'VOTING') return;
+
+            const atRiskContestants = data.contestants.filter(c => c.isAtRisk && c.status === 'active');
+            const finalVotes = { ...data.votes };
+            
+            // Se un giocatore non ha votato, assegna un voto casuale
+            Object.keys(data.players).forEach(pId => {
+                if (!data.players[pId].hasVoted) {
+                    const randomContestant = atRiskContestants[Math.floor(Math.random() * atRiskContestants.length)];
+                    finalVotes[pId] = randomContestant.id;
+                }
+            });
+            
+            const voteCounts = atRiskContestants.reduce((acc, c) => ({...acc, [c.id]: 0 }), {});
+            Object.values(finalVotes).forEach(votedId => { if(voteCounts[votedId] !== undefined) voteCounts[votedId]++; });
+            
+            const sortedVotes = Object.entries(voteCounts).sort((a, b) => b[1] - a[1]);
+            const maxVotes = sortedVotes[0][1];
+            const mostVoted = sortedVotes.filter(([, count]) => count === maxVotes).map(([id]) => parseInt(id));
+            
+            if (mostVoted.length > 1) { // In caso di pareggio
+                const timerEndTime = Date.now() + 30000;
+                await advanceGameState('TIEBREAKER', {
+                    finalVotes,
+                    tiebreaker: { contestants: mostVoted, votes: {} },
+                    timerEndTime,
+                    players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
+                });
+                setTimeout(processTiebreaker, 31000);
+            } else {
+                await advanceGameState('ELIMINATION_CEREMONY', {
+                    eliminationTarget: mostVoted[0],
+                    voteCounts,
+                    finalVotes
+                });
+            }
+        };
+        
+        // Elabora i voti dello spareggio
+        const processTiebreaker = async () => {
+            if (!isHost) return;
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            const lobbySnap = await getDoc(lobbyRef);
+            const data = lobbySnap.data();
+
+            if (data.gameState !== 'TIEBREAKER') return;
+
+            const tieContestants = data.tiebreaker.contestants;
+            const finalVotes = { ...data.tiebreaker.votes };
+
+            Object.keys(data.players).forEach(pId => {
+                if (!data.players[pId].hasVoted) {
+                    finalVotes[pId] = tieContestants[Math.floor(Math.random() * tieContestants.length)];
+                }
+            });
+            
+            const voteCounts = tieContestants.reduce((acc, cId) => ({...acc, [cId]: 0}), {});
+            Object.values(finalVotes).forEach(votedId => { if(voteCounts[votedId] !== undefined) voteCounts[votedId]++; });
+            
+            // Vince chi ha più voti (per essere salvato), quindi viene eliminato chi ne ha di meno
+            const sortedVotes = Object.entries(voteCounts).sort((a, b) => a[1] - b[1]);
+            const minVotes = sortedVotes[0][1];
+            const leastVoted = sortedVotes.filter(([, count]) => count === minVotes).map(([id]) => parseInt(id));
+
+            const eliminationTarget = leastVoted.length > 1 ? leastVoted[Math.floor(Math.random() * leastVoted.length)] : leastVoted[0];
+            
+            await advanceGameState('ELIMINATION_CEREMONY', {
+                eliminationTarget,
+                voteCounts: data.voteCounts, // Mantiene i conteggi originali per riferimento
+                finalVotes: data.finalVotes,
+                tiebreakerResult: { voteCounts, finalVotes }
+            });
+        };
+
+        // Seleziona i concorrenti a rischio per la modalità sorpresa
+        const runSurpriseRiskSelection = async (data) => {
+            const activeContestants = data.contestants.filter(c => c.status === 'active');
+            let atRiskIds = [];
+            if (activeContestants.length <= 5) {
+                atRiskIds = activeContestants.map(c => c.id);
+            } else {
+                const shuffled = [...activeContestants].sort(() => 0.5 - Math.random());
+                atRiskIds = shuffled.slice(0, 5).map(c => c.id);
+            }
+
+            const newContestants = data.contestants.map(c => ({ ...c, isAtRisk: atRiskIds.includes(c.id), isImmune: false }));
+            const voteType = Math.random() < 0.5 ? 'save' : 'eliminate'; // Decide casualmente se si vota per salvare o eliminare
+            const logMessage = `${atRiskIds.length} concorrenti sono stati selezionati a caso per essere a rischio!`;
+            
+            await advanceGameState('CHALLENGE_RESULT', {
+                contestants: newContestants,
+                log: [...data.log, logMessage],
+                voteType
+            });
+        };
+
+        // Avvia la votazione per la modalità sorpresa
+        const startSurpriseVoting = async (data) => {
+            const timerEndTime = Date.now() + 30000;
+            await advanceGameState('VOTING', {
+                timerEndTime,
+                rankings: {},
+                players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
+            });
+            setTimeout(processSurpriseVotes, 31000);
+        };
+        
+        // Elabora i voti della modalità sorpresa
+        const processSurpriseVotes = async () => {
+            if (!isHost) return;
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            const lobbySnap = await getDoc(lobbyRef);
+            const data = lobbySnap.data();
+
+            if (data.gameState !== 'VOTING') return;
+
+            const atRiskContestants = data.contestants.filter(c => c.isAtRisk && c.status === 'active');
+            const finalRankings = { ...data.rankings };
+            const ranks = Array.from({ length: atRiskContestants.length }, (_, i) => i + 1);
+
+            // Assegna classifiche casuali ai giocatori che non hanno votato
+            Object.keys(data.players).forEach(pId => {
+                if (!data.players[pId].hasVoted) {
+                    const shuffledRanks = [...ranks].sort(() => 0.5 - Math.random());
+                    const randomRanking = {};
+                    atRiskContestants.forEach((c, i) => { randomRanking[c.id] = shuffledRanks[i]; });
+                    finalRankings[pId] = randomRanking;
+                }
+            });
+            
+            // Assegna punti in base alla classifica
+            const pointsMap = { 1: 10, 2: 8, 3: 6, 4: 2, 5: 1 };
+            const scoreTotals = atRiskContestants.reduce((acc, c) => ({...acc, [c.id]: 0}), {});
+            
+            Object.values(finalRankings).forEach(ranking => {
+                Object.entries(ranking).forEach(([cId, rank]) => {
+                    if(scoreTotals[cId] !== undefined) scoreTotals[cId] += pointsMap[rank] || 0;
+                });
+            });
+
+            const sortedScores = Object.entries(scoreTotals).sort((a, b) => a[1] - b[1]);
+            // Se si vota per salvare, viene eliminato chi ha meno punti. Se si vota per eliminare, chi ne ha di più.
+            const eliminationTarget = parseInt(data.voteType === 'save' ? sortedScores[0][0] : sortedScores[sortedScores.length - 1][0]);
+            
+            const newContestants = data.contestants.map(c => ({ ...c, wasAtRisk: c.isAtRisk }));
+
+            await advanceGameState('ELIMINATION_CEREMONY', {
+                contestants: newContestants,
+                eliminationTarget,
+                scoreTotals,
+                finalRankings
+            });
+        };
+        
+        // Esegue la sequenza di rivelazione dell'eliminato
+        const runEliminationSequence = async (data) => {
+            if (!isHost) return;
+            
+            const atRiskContestants = data.contestants.filter(c => data.gameMode === 'standard' ? c.isAtRisk : c.wasAtRisk).filter(c => c.status === 'active');
+            const eliminationTargetId = data.eliminationTarget;
+            
+            // Determina l'ordine di rivelazione (il meno a rischio viene rivelato per primo)
+            const sortKey = data.gameMode === 'standard' ? data.voteCounts : data.scoreTotals;
+            const sortOrder = data.gameMode === 'standard' || (data.gameMode === 'surprise' && data.voteType === 'save') 
+                ? (a, b) => sortKey[a.id] - sortKey[b.id] // Meno voti/punti prima
+                : (a, b) => sortKey[b.id] - sortKey[a.id]; // Più punti prima
+            
+            const revealOrder = [
+                ...atRiskContestants.filter(c => c.id !== eliminationTargetId).sort(sortOrder),
+                atRiskContestants.find(c => c.id === eliminationTargetId)
+            ];
+
+            for (const contestant of revealOrder) {
+                await new Promise(resolve => setTimeout(resolve, 2500)); // Pausa per suspense
+                
+                const statusEl = document.getElementById(`ceremony-status-${contestant.id}`);
+                const contestantCardEl = document.getElementById(`ceremony-contestant-${contestant.id}`);
+                
+                if (contestant.id !== eliminationTargetId) {
+                    if(statusEl) statusEl.innerHTML = `<span class="font-bangers text-3xl text-green-400 suspense-reveal">SALVO</span>`;
+                    playSound('safe');
+                    if(contestantCardEl) contestantCardEl.classList.replace('contestant-at-risk', 'contestant-immune');
+                } else {
+                    if(statusEl) statusEl.innerHTML = `<span class="font-bangers text-3xl text-red-500 suspense-reveal">ELIMINATO</span>`;
+                    playSound('eliminated');
+                    if(contestantCardEl) contestantCardEl.classList.add('contestant-eliminated');
+                    
+                    const buttonsEl = document.getElementById('ceremony-buttons');
+                    if(buttonsEl) {
+                        const buttonId = data.gameMode === 'surprise' ? 'show-summary-btn' : 'next-episode-btn';
+                        const buttonText = data.gameMode === 'surprise' ? 'Mostra Riepilogo' : 'Prossimo Episodio';
+                        buttonsEl.innerHTML = `<button id="${buttonId}" class="btn btn-primary">${buttonText}</button>`;
+                        document.getElementById(buttonId).addEventListener('click', () => {
+                            if (data.gameMode === 'surprise') {
+                                advanceGameState('VOTE_SUMMARY', { eliminatedId: eliminationTargetId });
+                            } else {
+                                prepareNextEpisode(data);
+                            }
+                        });
+                    }
+                }
+            }
+        };
+
+        // Prepara il prossimo episodio o la finale
+        const prepareNextEpisode = async (data) => {
+            if (!isHost) return;
+            const eliminatedId = data.eliminationTarget || data.eliminatedId;
+            const newContestants = data.contestants.map(c => {
+                if (c.id === eliminatedId) {
+                    return { ...c, status: 'eliminated', isAtRisk: false, isImmune: false, wasAtRisk: false };
+                }
+                return { ...c, isAtRisk: false, isImmune: false, wasAtRisk: false };
+            });
+
+            const activeContestants = newContestants.filter(c => c.status === 'active');
+            
+            // Controlla se si è arrivati alla finale
+            if ((data.gameMode === 'standard' && activeContestants.length <= 2) || (data.gameMode === 'surprise' && activeContestants.length <= 1)) {
+               if (activeContestants.length === 2 && data.gameMode === 'standard') {
+                   await advanceGameState('FINALE_VOTE', {
+                       contestants: newContestants,
+                       finaleVotes: {},
+                       timerEndTime: Date.now() + 30000,
+                       players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
+                   });
+                   setTimeout(processFinale, 31000);
+               } else {
+                   const winnerId = activeContestants[0]?.id;
+                   if (winnerId !== undefined) {
+                       await advanceGameState('GAME_OVER', { contestants: newContestants, winnerId });
+                   }
+               }
+            } else {
+                const nextEpisodeNumber = data.currentEpisode + 1;
+                const updatedData = { ...data, contestants: newContestants, currentEpisode: nextEpisodeNumber };
+                
+                if (data.gameMode === 'standard') runStandardChallenge(updatedData);
+                else runSurpriseRiskSelection(updatedData);
+            }
+        };
+        
+        // Elabora i voti della finale
+        const processFinale = async () => {
+            if (!isHost) return;
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            const lobbySnap = await getDoc(lobbyRef);
+            const data = lobbySnap.data();
+
+            if (data.gameState !== 'FINALE_VOTE') return;
+
+            const finalists = data.contestants.filter(c => c.status === 'active');
+            const finalVotes = { ...data.finaleVotes };
+            
+            Object.keys(data.players).forEach(pId => {
+                if (!data.players[pId].hasVoted) {
+                    finalVotes[pId] = finalists[Math.floor(Math.random() * finalists.length)].id;
+                }
+            });
+            
+            const voteCounts = finalists.reduce((acc, c) => ({...acc, [c.id]: 0}), {});
+            Object.values(finalVotes).forEach(votedId => { if(voteCounts[votedId] !== undefined) voteCounts[votedId]++; });
+            
+            const sortedVotes = Object.entries(voteCounts).sort((a,b) => b[1] - a[1]);
+            const winnerId = parseInt(sortedVotes[0][0]);
+            
+            await advanceGameState('GAME_OVER', { winnerId, finaleVotes: finalVotes });
+        };
+
+        // --- FUNZIONI DI UTILITÀ ---
+
+        // Valida il nickname inserito
+        const getValidNickname = () => {
+            const nickname = nicknameInput.value.trim();
+            if (!nickname) {
+                showError("Il nickname non può essere vuoto.");
+                return null;
+            }
+            if (nickname.length > 15) {
+                showError("Il nickname non può superare i 15 caratteri.");
+                return null;
+            }
+            return nickname;
+        };
+
+        // Genera un codice casuale per la lobby
+        const generateLobbyCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        // Genera l'elenco dei concorrenti
+        const generateContestants = (config, customContestants) => {
+            const { numContestants, numTeams } = config;
+            const defaultNames = ["Alex", "Ben", "Chloe", "David", "Eva", "Frank", "Gina", "Hugo", "Ivy", "Jack", "Kate", "Leo", "Mia", "Noah", "Olga", "Paul", "Quinn", "Rosa", "Sam", "Tina", "Uma", "Vince", "Willa", "Xeno", "Yara", "Zack", "Aria", "Bruno", "Cara", "Dante"];
+            const teams = ["red", "blue", "green"];
+            
+            // LOGICA CONFERMATA: L'operatore modulo (%) distribuisce i concorrenti uno ad uno
+            // tra le squadre, garantendo che siano il più bilanciate possibile.
+            // Es: 20 concorrenti / 3 squadre = 7 in squadra rossa, 7 in blu, 6 in verde.
+            return Array.from({ length: numContestants }, (_, i) => {
+                const custom = customContestants?.find(c => c.id === i);
+                return {
+                    id: i,
+                    name: custom?.name || defaultNames[i % defaultNames.length] + (Math.floor(i / defaultNames.length) > 0 ? ` ${Math.floor(i / defaultNames.length) + 1}` : ''),
+                    pngUrl: custom?.pngUrl || '',
+                    team: teams[i % numTeams],
+                    status: 'active',
+                    isImmune: false,
+                    isAtRisk: false,
+                    wasAtRisk: false,
+                };
+            });
+        };
+
+        // Imposta e gestisce il timer per le votazioni
+        const setupTimer = (endTime) => {
+            if (timerInterval) clearInterval(timerInterval);
+            const timerEl = document.getElementById('timer');
+            if (!timerEl) return;
+
+            timerInterval = setInterval(() => {
+                const remaining = Math.round((endTime - Date.now()) / 1000);
+                if (remaining >= 0) {
+                    timerEl.textContent = remaining;
+                    if (remaining <= 5 && remaining > 0) {
+                        timerEl.classList.add('text-red-500', 'animate-ping');
+                        playSound('tick');
+                    } else {
+                        timerEl.classList.remove('text-red-500', 'animate-ping');
+                    }
+                } else {
+                    timerEl.textContent = '0';
+                    clearInterval(timerInterval);
+                }
+            }, 1000);
+        };
+        
+        // Riproduce effetti sonori utilizzando Tone.js
+        const playSound = (soundType) => {
+            try {
+                Tone.start();
+                const sounds = {
+                    'click': "C4", 'confirm': "C5", 'vote': "C2", 'safe': ["C4", "E4", "G4"], 'eliminated': "C3"
+                };
+                if (sounds[soundType]) {
+                    const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    synth.triggerAttackRelease(sounds[soundType], "8n", Tone.now());
+                } else if (soundType === 'error') new Tone.NoiseSynth().toDestination().triggerAttackRelease("0.1");
+                else if (soundType === 'transition') new Tone.MetalSynth({frequency: 100, envelope: {attack: 0.001, decay: 0.1, release: 0.01}, harmonicity: 3.1, modulationIndex: 16, resonance: 4000, octaves: 1.5}).toDestination().triggerAttackRelease("8n");
+                else if (soundType === 'tick') new Tone.MembraneSynth({pitchDecay: 0.008, octaves: 2, envelope: {attack: 0.0006, decay: 0.25, sustain: 0}}).toDestination().triggerAttackRelease("G4", "32n");
+            } catch (e) { console.warn("Tone.js non ha potuto riprodurre il suono.", e); }
+        };
+
+        // Mostra un messaggio di errore temporaneo nella schermata principale
+        const showError = (message) => {
+            homeError.textContent = message;
+            setTimeout(() => homeError.textContent = '', 3000);
+            playSound('error');
+        };
+        
+        // Mostra un messaggio in una modale
+        const showModalMessage = (title, message, isActionable = false, autoCloseDelay = 0) => {
+            modalContent.innerHTML = `
+                <h3 class="font-bangers text-4xl text-yellow-400">${title}</h3>
+                <p class="mt-4 text-lg">${message}</p>
+                ${isActionable ? '<button id="modal-ok-btn" class="btn btn-primary mt-6">OK</button>' : ''}
+            `;
+            modal.classList.remove('hidden');
+            if (isActionable) {
+                document.getElementById('modal-ok-btn').addEventListener('click', () => modal.classList.add('hidden'));
+            }
+            if (autoCloseDelay > 0) {
+                setTimeout(() => modal.classList.add('hidden'), autoCloseDelay);
+            }
+        };
+
+        // --- EVENT LISTENER PRINCIPALI ---
+
+        confirmNicknameBtn.addEventListener('click', () => {
+            playSound('click');
+            const nickname = getValidNickname();
+            if (nickname) {
+                currentNickname = nickname;
+                nicknameDisplay.textContent = nickname;
+                nicknameSection.classList.add('hidden');
+                mainMenuSection.classList.remove('hidden');
+            }
+        });
+
+        createLobbyBtn.addEventListener('click', () => { playSound('click'); createLobby(); });
+        showJoinCodeBtn.addEventListener('click', () => { playSound('click'); joinCodeSection.classList.toggle('hidden'); });
+        joinLobbyBtn.addEventListener('click', () => { playSound('click'); attemptToJoinLobby(lobbyCodeInput.value.trim().toUpperCase()); });
+        findLobbiesBtn.addEventListener('click', () => { playSound('click'); fetchAndRenderLobbies(); });
+        refreshLobbiesBtn.addEventListener('click', () => { playSound('click'); fetchAndRenderLobbies(); });
+        backToMenuBtn.addEventListener('click', () => { playSound('click'); lobbyListScreen.classList.add('hidden'); homeScreen.classList.remove('hidden'); });
+        saveCustomizationBtn.addEventListener('click', saveCustomization);
+        cancelCustomizationBtn.addEventListener('click', () => customizationModal.classList.add('hidden'));
+
+        // Gestione dinamica delle impostazioni della lobby (per l'host)
+        window.updateConfig = async (key, value) => {
+            playSound('click');
+            const numValue = Number(value);
+            const finalValue = isNaN(numValue) ? value : numValue;
+            
+            const updateData = { [key]: finalValue };
+
+            // Se cambia la modalità di gioco, reimposta il numero di concorrenti a un valore valido
+            if(key === 'gameMode') {
+                const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+                const lobbySnap = await getDoc(lobbyRef);
+                const currentConfig = lobbySnap.data().config;
+                if (value === 'standard' && currentConfig.numContestants < 16) {
+                    updateData['config.numContestants'] = 16;
+                } else if (value === 'surprise' && currentConfig.numContestants > 18) {
+                    updateData['config.numContestants'] = 18;
+                }
+            }
+
+            const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
+            await updateDoc(lobbyRef, updateData);
+        };
+        
+        // Inizializzazione dell'app al caricamento della pagina
+        initialize();
+    </script>
+</body>
+</html>
