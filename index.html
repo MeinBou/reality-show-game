@@ -23,6 +23,9 @@
         .btn {
             @apply px-6 py-3 rounded-lg font-bold text-white shadow-lg transition-transform transform hover:scale-105;
         }
+        .btn:disabled {
+            @apply bg-gray-500 cursor-not-allowed transform-none shadow-none;
+        }
         .btn-primary {
             @apply bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700;
         }
@@ -86,8 +89,8 @@
             <p class="mt-2 mb-8 text-lg text-gray-400">Diventa il giudice. Decidi chi vince.</p>
             
             <div id="nickname-section" class="max-w-md mx-auto space-y-4">
-                <input type="text" id="nickname-input" placeholder="Il tuo Nickname" class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-center focus:outline-none focus:ring-2 focus:ring-purple-500">
-                <button id="confirm-nickname-btn" class="btn btn-primary w-full">Conferma Nickname</button>
+                <input type="text" id="nickname-input" placeholder="Autenticazione in corso..." class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-center focus:outline-none focus:ring-2 focus:ring-purple-500" disabled>
+                <button id="confirm-nickname-btn" class="btn btn-primary w-full" disabled>Conferma Nickname</button>
             </div>
 
             <div id="main-menu-section" class="hidden max-w-md mx-auto space-y-4">
@@ -212,6 +215,11 @@ const appId = 'my-reality-show-game-v1';
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
+                    // FIX: Abilita l'interfaccia utente solo dopo che l'autenticazione è andata a buon fine.
+                    // Questo previene che l'utente possa creare una lobby prima di avere un ID utente valido.
+                    nicknameInput.disabled = false;
+                    confirmNicknameBtn.disabled = false;
+                    nicknameInput.placeholder = "Il tuo Nickname";
                 } else {
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -222,6 +230,7 @@ const appId = 'my-reality-show-game-v1';
                     } catch (error) {
                         console.error("Errore di autenticazione:", error);
                         showError("Impossibile autenticare l'utente.");
+                        nicknameInput.placeholder = "Autenticazione fallita";
                     }
                 }
             });
@@ -230,7 +239,7 @@ const appId = 'my-reality-show-game-v1';
         // Crea una nuova lobby nel database
         const createLobby = async () => {
             const nickname = currentNickname;
-            if (!nickname) return;
+            if (!nickname || !userId) return; // Aggiunto controllo su userId
 
             const lobbyId = generateLobbyCode();
             currentLobbyId = lobbyId;
