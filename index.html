@@ -519,16 +519,17 @@ const appId = 'my-reality-show-game-v1';
             const isHostView = data.hostId === userId;
 
             let configHtml = '';
+            let descriptionHtml = ''; // Variabile per la descrizione
+            if (data.gameMode === 'standard') {
+                descriptionHtml = '<p class="text-center mt-3 text-gray-400 italic">Modalità Classica: Le squadre si sfidano. La squadra perdente va al televoto e uno dei suoi membri viene eliminato.</p>';
+            } else {
+                descriptionHtml = '<p class="text-center mt-3 text-gray-400 italic">Modalità Sorpresa: 5 concorrenti vengono scelti a caso per andare a rischio. I giudici li classificano per salvarli o eliminarli!</p>';
+            }
+
             if (isHostView) {
                 const isStandard = data.gameMode === 'standard';
                 const isSurprise = data.gameMode === 'surprise';
-                let description = '';
-                if (isStandard) {
-                    description = 'Modalità Classica: Le squadre si sfidano. La squadra perdente va al televoto e uno dei suoi membri viene eliminato.';
-                } else {
-                    description = 'Modalità Sorpresa: 5 concorrenti vengono scelti a caso per andare a rischio. I giudici li classificano per salvarli o eliminarli!';
-                }
-
+                
                 configHtml = `
                     <div class="mt-8 space-y-4 text-left max-w-lg mx-auto">
                         <h3 class="text-2xl font-bold text-center text-yellow-400">Impostazioni</h3>
@@ -538,7 +539,7 @@ const appId = 'my-reality-show-game-v1';
                                 <button onclick="window.updateConfig('gameMode', 'standard')" class="flex-1 btn ${isStandard ? 'btn-primary' : 'btn-secondary'}">Standard Reality</button>
                                 <button onclick="window.updateConfig('gameMode', 'surprise')" class="flex-1 btn ${isSurprise ? 'btn-primary' : 'btn-secondary'}">Eliminazione a Sorpresa</button>
                             </div>
-                            <p class="text-center mt-3 text-gray-400 italic">${description}</p>
+                            ${descriptionHtml}
                         </div>
                         <div>
                             <label class="block mb-2 font-bold">Numero Concorrenti:</label>
@@ -559,6 +560,9 @@ const appId = 'my-reality-show-game-v1';
                         <button id="start-game-btn" class="btn btn-primary w-full sm:w-auto flex-grow">Avvia Gioco</button>
                     </div>
                 `;
+            } else {
+                // Vista per i giocatori non-host
+                configHtml = `<div class="mt-8">${descriptionHtml}</div>`;
             }
 
             lobbyScreen.innerHTML = `
@@ -708,7 +712,6 @@ const appId = 'my-reality-show-game-v1';
             if (data.gameMode === 'standard') {
                 contestantDisplay = renderTeamDisplay(data);
             } else {
-                // MODIFICA: Mostra i 5 concorrenti a rischio dopo la suspense
                 const atRiskContestants = data.contestants.filter(c => c.isAtRisk);
                 contestantDisplay = `
                     <div class="mt-8">
@@ -1111,6 +1114,7 @@ const appId = 'my-reality-show-game-v1';
                 const timerEndTime = Date.now() + 30000;
                 await advanceGameState('TIEBREAKER', {
                     finalVotes,
+                    voteCounts, // FIX: Passa i voteCounts allo stato di pareggio
                     tiebreaker: { contestants: mostVoted, votes: {} },
                     timerEndTime,
                     players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
@@ -1194,14 +1198,15 @@ const appId = 'my-reality-show-game-v1';
 
         // Avvia la votazione per la modalità sorpresa
         const startSurpriseVoting = async (data) => {
-            const timerEndTime = Date.now() + 30000;
+            // MODIFICA: Timer aumentato a 60 secondi
+            const timerEndTime = Date.now() + 60000;
             await advanceGameState('VOTING', {
                 timerEndTime,
                 rankings: {},
                 players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
             });
             clearTimeout(voteProcessingTimeout);
-            voteProcessingTimeout = setTimeout(processSurpriseVotes, 31000);
+            voteProcessingTimeout = setTimeout(processSurpriseVotes, 61000);
         };
         
         // Elabora i voti della modalità sorpresa
