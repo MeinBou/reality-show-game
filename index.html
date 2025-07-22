@@ -73,6 +73,14 @@
         .suspense-reveal {
             animation: suspenseReveal 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
         }
+        @keyframes riskReveal {
+            0% { transform: scale(1); box-shadow: 0 0 0px rgba(239, 68, 68, 0); }
+            50% { transform: scale(1.1); box-shadow: 0 0 30px rgba(239, 68, 68, 0.7); }
+            100% { transform: scale(1); box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+        }
+        .risk-reveal-animation {
+            animation: riskReveal 0.7s ease-out forwards;
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -172,6 +180,7 @@ const appId = 'my-reality-show-game-v1';
         let timerInterval = null;
         let isHost = false;
         let currentNickname = '';
+        let voteProcessingTimeout = null;
         
         // Riferimenti agli elementi del DOM
         const homeScreen = document.getElementById('home-screen');
@@ -211,12 +220,9 @@ const appId = 'my-reality-show-game-v1';
             db = getFirestore(app);
             auth = getAuth(app);
 
-            // Gestisce lo stato di autenticazione dell'utente
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
-                    // FIX: Abilita l'interfaccia utente solo dopo che l'autenticazione è andata a buon fine.
-                    // Questo previene che l'utente possa creare una lobby prima di avere un ID utente valido.
                     nicknameInput.disabled = false;
                     confirmNicknameBtn.disabled = false;
                     nicknameInput.placeholder = "Il tuo Nickname";
@@ -239,7 +245,7 @@ const appId = 'my-reality-show-game-v1';
         // Crea una nuova lobby nel database
         const createLobby = async () => {
             const nickname = currentNickname;
-            if (!nickname || !userId) return; // Aggiunto controllo su userId
+            if (!nickname || !userId) return;
 
             const lobbyId = generateLobbyCode();
             currentLobbyId = lobbyId;
@@ -334,10 +340,8 @@ const appId = 'my-reality-show-game-v1';
             const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
             
             if (isHost) {
-                // Se l'host esce, cancella la lobby per tutti.
                 await deleteDoc(lobbyRef).catch(err => console.error("Impossibile cancellare la lobby:", err));
             } else {
-                // Se un giocatore normale esce, rimuove solo se stesso.
                 await updateDoc(lobbyRef, { [`players.${userId}`]: deleteField() })
                   .catch(err => console.error("Impossibile rimuovere il giocatore:", err));
             }
@@ -396,6 +400,7 @@ const appId = 'my-reality-show-game-v1';
             const states = {
                 'LOBBY': renderLobbyScreen,
                 'GAME_STARTING': renderGameStarting,
+                'SURPRISE_REVEAL': renderGameScreen,
                 'CHALLENGE_RESULT': renderGameScreen,
                 'VOTING': renderGameScreen,
                 'ELIMINATION_CEREMONY': renderGameScreen,
@@ -406,12 +411,42 @@ const appId = 'my-reality-show-game-v1';
             };
             if (states[data.gameState]) {
                 states[data.gameState](data);
-                // Se lo stato è ELIMINATION_CEREMONY e l'utente è l'host, avvia la sequenza di eliminazione
                 if (data.gameState === 'ELIMINATION_CEREMONY' && isHost) {
                     runEliminationSequence(data);
                 }
+                if (isHost) {
+                    checkAllVotesIn(data);
+                }
             } else {
                 console.warn("Stato del gioco non riconosciuto:", data.gameState);
+            }
+        };
+        
+        // Controlla se tutti hanno votato per procedere prima della fine del timer
+        const checkAllVotesIn = (data) => {
+            const { players, gameState, gameMode } = data;
+
+            if (!['VOTING', 'TIEBREAKER', 'FINALE_VOTE'].includes(gameState)) {
+                return;
+            }
+
+            const totalPlayers = Object.keys(players).length;
+            const playersWhoVoted = Object.values(players).filter(p => p.hasVoted).length;
+
+            if (totalPlayers > 0 && totalPlayers === playersWhoVoted) {
+                if (voteProcessingTimeout) {
+                    clearTimeout(voteProcessingTimeout);
+                    voteProcessingTimeout = null;
+                }
+
+                if (gameState === 'VOTING') {
+                    if (gameMode === 'standard') processStandardVotes();
+                    else processSurpriseVotes();
+                } else if (gameState === 'TIEBREAKER') {
+                    processTiebreaker();
+                } else if (gameState === 'FINALE_VOTE') {
+                    processFinale();
+                }
             }
         };
 
@@ -487,6 +522,13 @@ const appId = 'my-reality-show-game-v1';
             if (isHostView) {
                 const isStandard = data.gameMode === 'standard';
                 const isSurprise = data.gameMode === 'surprise';
+                let description = '';
+                if (isStandard) {
+                    description = 'Modalità Classica: Le squadre si sfidano. La squadra perdente va al televoto e uno dei suoi membri viene eliminato.';
+                } else {
+                    description = 'Modalità Sorpresa: 5 concorrenti vengono scelti a caso per andare a rischio. I giudici li classificano per salvarli o eliminarli!';
+                }
+
                 configHtml = `
                     <div class="mt-8 space-y-4 text-left max-w-lg mx-auto">
                         <h3 class="text-2xl font-bold text-center text-yellow-400">Impostazioni</h3>
@@ -496,6 +538,7 @@ const appId = 'my-reality-show-game-v1';
                                 <button onclick="window.updateConfig('gameMode', 'standard')" class="flex-1 btn ${isStandard ? 'btn-primary' : 'btn-secondary'}">Standard Reality</button>
                                 <button onclick="window.updateConfig('gameMode', 'surprise')" class="flex-1 btn ${isSurprise ? 'btn-primary' : 'btn-secondary'}">Eliminazione a Sorpresa</button>
                             </div>
+                            <p class="text-center mt-3 text-gray-400 italic">${description}</p>
                         </div>
                         <div>
                             <label class="block mb-2 font-bold">Numero Concorrenti:</label>
@@ -575,6 +618,7 @@ const appId = 'my-reality-show-game-v1';
             gameScreen.classList.remove('hidden');
             
             const states = {
+                'SURPRISE_REVEAL': renderSurpriseReveal,
                 'CHALLENGE_RESULT': renderChallengeResult,
                 'VOTING': renderVoting,
                 'ELIMINATION_CEREMONY': renderEliminationCeremony,
@@ -600,6 +644,10 @@ const appId = 'my-reality-show-game-v1';
             
             if (data.gameState === 'VOTING' || data.gameState === 'TIEBREAKER' || data.gameState === 'FINALE_VOTE') {
                 setupTimer(data.timerEndTime);
+            }
+
+            if (data.gameState === 'SURPRISE_REVEAL') {
+                runSurpriseRevealAnimation(data);
             }
             
             // Aggiunge gli event listener necessari per la schermata corrente
@@ -655,12 +703,34 @@ const appId = 'my-reality-show-game-v1';
                     else startSurpriseVoting(data);
                 }, 5000);
             }
+            
+            let contestantDisplay = '';
+            if (data.gameMode === 'standard') {
+                contestantDisplay = renderTeamDisplay(data);
+            } else {
+                // MODIFICA: Mostra i 5 concorrenti a rischio dopo la suspense
+                const atRiskContestants = data.contestants.filter(c => c.isAtRisk);
+                contestantDisplay = `
+                    <div class="mt-8">
+                        <h4 class="font-bangers text-4xl text-red-500">Concorrenti a Rischio</h4>
+                        <div class="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 max-w-4xl mx-auto">
+                            ${atRiskContestants.map(c => `
+                                <div class="contestant-card contestant-at-risk">
+                                    <img src="${c.pngUrl || `https://placehold.co/80x80/c53030/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/80x80/c53030/e2e8f0?text=${c.name.charAt(0)}'" class="w-20 h-20 rounded-full mb-2 object-cover">
+                                    <p class="font-bold text-lg">${c.name}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
             return `
                 <div class="card text-center">
                     <h3 class="text-3xl font-bold text-purple-400">Risultato Sfida</h3>
                     <p class="text-xl mt-4">${logMessage}</p>
                     <p class="text-lg mt-8 italic">La votazione inizierà a breve...</p>
-                    ${renderTeamDisplay(data)}
+                    ${contestantDisplay}
                 </div>
             `;
         };
@@ -670,7 +740,6 @@ const appId = 'my-reality-show-game-v1';
             const hasVoted = data.players[userId]?.hasVoted || false;
             let votingContent = '';
 
-            // LOGICA CONFERMATA: Solo i concorrenti a rischio (del team perdente) vengono mostrati per la votazione.
             if (data.gameMode === 'standard') {
                 const myVote = data.votes ? data.votes[userId] : null;
                 const atRiskContestants = data.contestants.filter(c => c.isAtRisk && c.status === 'active');
@@ -695,7 +764,6 @@ const appId = 'my-reality-show-game-v1';
                     : 'Classifica per ELIMINARE. Il primo in classifica è il più a rischio.';
                 const titleColor = data.voteType === 'save' ? 'text-green-400' : 'text-red-500';
 
-                // MODIFICA: Aggiunta l'immagine del concorrente nella lista di classifica
                 votingContent = `
                     <h3 class="text-3xl font-bold ${titleColor}">Classifica i Concorrenti!</h3>
                     <p class="text-lg mt-2">${voteTypeMessage}</p>
@@ -881,8 +949,6 @@ const appId = 'my-reality-show-game-v1';
                                 let classes = '';
                                 if (c.isImmune) classes += ' contestant-immune';
                                 if (c.isAtRisk) classes += ' contestant-at-risk';
-                                // BUG FIX: La classe del colore del bordo viene aggiunta dinamicamente.
-                                // Le classi complete sono state inserite in un div nascosto per garantire che Tailwind le generi.
                                 return `
                                 <div class="contestant-card p-1 ${classes}">
                                     <img src="${c.pngUrl || `https://placehold.co/60x60/4a5568/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/60x60/4a5568/e2e8f0?text=${c.name.charAt(0)}'" class="w-12 h-12 rounded-full mx-auto mb-1 border-4 border-${c.team}-500 object-cover">
@@ -897,6 +963,44 @@ const appId = 'my-reality-show-game-v1';
             `;
         };
         
+        // Renderizza la schermata di suspense per la modalità sorpresa
+        const renderSurpriseReveal = (data) => {
+            const activeContestants = data.contestants.filter(c => c.status === 'active');
+            return `
+                <div class="card text-center">
+                    <h3 class="font-bangers text-6xl text-yellow-400">Chi sarà a rischio?</h3>
+                    <p class="text-xl mt-2">Cinque concorrenti stanno per essere scelti a caso...</p>
+                    <div class="mt-8 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                        ${activeContestants.map(c => `
+                            <div id="reveal-contestant-${c.id}" class="contestant-card p-1">
+                                <img src="${c.pngUrl || `https://placehold.co/80x80/4a5568/e2e8f0?text=${c.name.charAt(0)}`}" onerror="this.src='https://placehold.co/80x80/4a5568/e2e8f0?text=${c.name.charAt(0)}'" class="w-16 h-16 rounded-full mx-auto mb-1 border-2 border-gray-500 object-cover">
+                                <p class="font-bold text-sm truncate">${c.name}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        };
+
+        // Esegue l'animazione di suspense
+        const runSurpriseRevealAnimation = (data) => {
+            const { atRiskIds } = data;
+            atRiskIds.forEach((id, index) => {
+                setTimeout(() => {
+                    const card = document.getElementById(`reveal-contestant-${id}`);
+                    if (card) {
+                        card.classList.add('contestant-at-risk', 'risk-reveal-animation');
+                        playSound('eliminated');
+                    }
+                }, (index + 1) * 1200); // Ritardo di 1.2 secondi tra ogni rivelazione
+            });
+
+            if (isHost) {
+                const totalAnimationTime = (atRiskIds.length + 1) * 1200;
+                setTimeout(() => finalizeSurpriseSelection(data), totalAnimationTime);
+            }
+        };
+
         // Apre la modale per personalizzare i concorrenti
         const openCustomizationModal = (data) => {
             const form = document.getElementById('customization-form');
@@ -955,7 +1059,6 @@ const appId = 'my-reality-show-game-v1';
                 winningTeams.push(teams[0]);
             }
             
-            // LOGICA CONFERMATA: Solo i membri dei team perdenti sono a rischio. I vincitori sono immuni.
             const newContestants = data.contestants.map(c => ({
                 ...c,
                 isImmune: winningTeams.includes(c.team),
@@ -974,7 +1077,8 @@ const appId = 'my-reality-show-game-v1';
                 votes: {},
                 players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
             });
-            setTimeout(processStandardVotes, 31000);
+            clearTimeout(voteProcessingTimeout);
+            voteProcessingTimeout = setTimeout(processStandardVotes, 31000);
         };
         
         // Elabora i voti della modalità standard
@@ -989,7 +1093,6 @@ const appId = 'my-reality-show-game-v1';
             const atRiskContestants = data.contestants.filter(c => c.isAtRisk && c.status === 'active');
             const finalVotes = { ...data.votes };
             
-            // Se un giocatore non ha votato, assegna un voto casuale
             Object.keys(data.players).forEach(pId => {
                 if (!data.players[pId].hasVoted) {
                     const randomContestant = atRiskContestants[Math.floor(Math.random() * atRiskContestants.length)];
@@ -1004,7 +1107,7 @@ const appId = 'my-reality-show-game-v1';
             const maxVotes = sortedVotes[0][1];
             const mostVoted = sortedVotes.filter(([, count]) => count === maxVotes).map(([id]) => parseInt(id));
             
-            if (mostVoted.length > 1) { // In caso di pareggio
+            if (mostVoted.length > 1) {
                 const timerEndTime = Date.now() + 30000;
                 await advanceGameState('TIEBREAKER', {
                     finalVotes,
@@ -1012,7 +1115,8 @@ const appId = 'my-reality-show-game-v1';
                     timerEndTime,
                     players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
                 });
-                setTimeout(processTiebreaker, 31000);
+                clearTimeout(voteProcessingTimeout);
+                voteProcessingTimeout = setTimeout(processTiebreaker, 31000);
             } else {
                 await advanceGameState('ELIMINATION_CEREMONY', {
                     eliminationTarget: mostVoted[0],
@@ -1043,7 +1147,6 @@ const appId = 'my-reality-show-game-v1';
             const voteCounts = tieContestants.reduce((acc, cId) => ({...acc, [cId]: 0}), {});
             Object.values(finalVotes).forEach(votedId => { if(voteCounts[votedId] !== undefined) voteCounts[votedId]++; });
             
-            // Vince chi ha più voti (per essere salvato), quindi viene eliminato chi ne ha di meno
             const sortedVotes = Object.entries(voteCounts).sort((a, b) => a[1] - b[1]);
             const minVotes = sortedVotes[0][1];
             const leastVoted = sortedVotes.filter(([, count]) => count === minVotes).map(([id]) => parseInt(id));
@@ -1052,7 +1155,7 @@ const appId = 'my-reality-show-game-v1';
             
             await advanceGameState('ELIMINATION_CEREMONY', {
                 eliminationTarget,
-                voteCounts: data.voteCounts, // Mantiene i conteggi originali per riferimento
+                voteCounts: data.voteCounts,
                 finalVotes: data.finalVotes,
                 tiebreakerResult: { voteCounts, finalVotes }
             });
@@ -1069,9 +1172,17 @@ const appId = 'my-reality-show-game-v1';
                 atRiskIds = shuffled.slice(0, 5).map(c => c.id);
             }
 
+            const voteType = Math.random() < 0.5 ? 'save' : 'eliminate';
+            
+            await advanceGameState('SURPRISE_REVEAL', { atRiskIds, voteType });
+        };
+        
+        // Finalizza la selezione dopo l'animazione di suspense
+        const finalizeSurpriseSelection = async (data) => {
+            if (!isHost) return;
+            const { atRiskIds, voteType } = data;
             const newContestants = data.contestants.map(c => ({ ...c, isAtRisk: atRiskIds.includes(c.id), isImmune: false }));
-            const voteType = Math.random() < 0.5 ? 'save' : 'eliminate'; // Decide casualmente se si vota per salvare o eliminare
-            const logMessage = `${atRiskIds.length} concorrenti sono stati selezionati a caso per essere a rischio!`;
+            const logMessage = `${atRiskIds.length} concorrenti sono a rischio eliminazione!`;
             
             await advanceGameState('CHALLENGE_RESULT', {
                 contestants: newContestants,
@@ -1079,6 +1190,7 @@ const appId = 'my-reality-show-game-v1';
                 voteType
             });
         };
+
 
         // Avvia la votazione per la modalità sorpresa
         const startSurpriseVoting = async (data) => {
@@ -1088,7 +1200,8 @@ const appId = 'my-reality-show-game-v1';
                 rankings: {},
                 players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
             });
-            setTimeout(processSurpriseVotes, 31000);
+            clearTimeout(voteProcessingTimeout);
+            voteProcessingTimeout = setTimeout(processSurpriseVotes, 31000);
         };
         
         // Elabora i voti della modalità sorpresa
@@ -1104,7 +1217,6 @@ const appId = 'my-reality-show-game-v1';
             const finalRankings = { ...data.rankings };
             const ranks = Array.from({ length: atRiskContestants.length }, (_, i) => i + 1);
 
-            // Assegna classifiche casuali ai giocatori che non hanno votato
             Object.keys(data.players).forEach(pId => {
                 if (!data.players[pId].hasVoted) {
                     const shuffledRanks = [...ranks].sort(() => 0.5 - Math.random());
@@ -1114,7 +1226,6 @@ const appId = 'my-reality-show-game-v1';
                 }
             });
             
-            // Assegna punti in base alla classifica
             const pointsMap = { 1: 10, 2: 8, 3: 6, 4: 2, 5: 1 };
             const scoreTotals = atRiskContestants.reduce((acc, c) => ({...acc, [c.id]: 0}), {});
             
@@ -1125,7 +1236,6 @@ const appId = 'my-reality-show-game-v1';
             });
 
             const sortedScores = Object.entries(scoreTotals).sort((a, b) => a[1] - b[1]);
-            // Se si vota per salvare, viene eliminato chi ha meno punti. Se si vota per eliminare, chi ne ha di più.
             const eliminationTarget = parseInt(data.voteType === 'save' ? sortedScores[0][0] : sortedScores[sortedScores.length - 1][0]);
             
             const newContestants = data.contestants.map(c => ({ ...c, wasAtRisk: c.isAtRisk }));
@@ -1145,11 +1255,10 @@ const appId = 'my-reality-show-game-v1';
             const atRiskContestants = data.contestants.filter(c => data.gameMode === 'standard' ? c.isAtRisk : c.wasAtRisk).filter(c => c.status === 'active');
             const eliminationTargetId = data.eliminationTarget;
             
-            // Determina l'ordine di rivelazione (il meno a rischio viene rivelato per primo)
             const sortKey = data.gameMode === 'standard' ? data.voteCounts : data.scoreTotals;
             const sortOrder = data.gameMode === 'standard' || (data.gameMode === 'surprise' && data.voteType === 'save') 
-                ? (a, b) => sortKey[a.id] - sortKey[b.id] // Meno voti/punti prima
-                : (a, b) => sortKey[b.id] - sortKey[a.id]; // Più punti prima
+                ? (a, b) => sortKey[a.id] - sortKey[b.id]
+                : (a, b) => sortKey[b.id] - sortKey[a.id];
             
             const revealOrder = [
                 ...atRiskContestants.filter(c => c.id !== eliminationTargetId).sort(sortOrder),
@@ -1157,7 +1266,7 @@ const appId = 'my-reality-show-game-v1';
             ];
 
             for (const contestant of revealOrder) {
-                await new Promise(resolve => setTimeout(resolve, 2500)); // Pausa per suspense
+                await new Promise(resolve => setTimeout(resolve, 2500));
                 
                 const statusEl = document.getElementById(`ceremony-status-${contestant.id}`);
                 const contestantCardEl = document.getElementById(`ceremony-contestant-${contestant.id}`);
@@ -1201,7 +1310,6 @@ const appId = 'my-reality-show-game-v1';
 
             const activeContestants = newContestants.filter(c => c.status === 'active');
             
-            // Controlla se si è arrivati alla finale
             if ((data.gameMode === 'standard' && activeContestants.length <= 2) || (data.gameMode === 'surprise' && activeContestants.length <= 1)) {
                if (activeContestants.length === 2 && data.gameMode === 'standard') {
                    await advanceGameState('FINALE_VOTE', {
@@ -1210,7 +1318,8 @@ const appId = 'my-reality-show-game-v1';
                        timerEndTime: Date.now() + 30000,
                        players: Object.keys(data.players).reduce((acc, key) => ({...acc, [key]: { ...data.players[key], hasVoted: false } }), {})
                    });
-                   setTimeout(processFinale, 31000);
+                   clearTimeout(voteProcessingTimeout);
+                   voteProcessingTimeout = setTimeout(processFinale, 31000);
                } else {
                    const winnerId = activeContestants[0]?.id;
                    if (winnerId !== undefined) {
@@ -1278,9 +1387,6 @@ const appId = 'my-reality-show-game-v1';
             const defaultNames = ["Alex", "Ben", "Chloe", "David", "Eva", "Frank", "Gina", "Hugo", "Ivy", "Jack", "Kate", "Leo", "Mia", "Noah", "Olga", "Paul", "Quinn", "Rosa", "Sam", "Tina", "Uma", "Vince", "Willa", "Xeno", "Yara", "Zack", "Aria", "Bruno", "Cara", "Dante"];
             const teams = ["red", "blue", "green"];
             
-            // LOGICA CONFERMATA: L'operatore modulo (%) distribuisce i concorrenti uno ad uno
-            // tra le squadre, garantendo che siano il più bilanciate possibile.
-            // Es: 20 concorrenti / 3 squadre = 7 in squadra rossa, 7 in blu, 6 in verde.
             return Array.from({ length: numContestants }, (_, i) => {
                 const custom = customContestants?.find(c => c.id === i);
                 return {
@@ -1388,7 +1494,6 @@ const appId = 'my-reality-show-game-v1';
             
             const updateData = { [key]: finalValue };
 
-            // Se cambia la modalità di gioco, reimposta il numero di concorrenti a un valore valido
             if(key === 'gameMode') {
                 const lobbyRef = doc(db, `artifacts/${appId}/public/data/lobbies`, currentLobbyId);
                 const lobbySnap = await getDoc(lobbyRef);
