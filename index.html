@@ -19,6 +19,7 @@
         .character-card {
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
             border: 2px solid transparent;
+            position: relative;
         }
         .character-card.selectable:hover {
             transform: scale(1.05);
@@ -81,15 +82,16 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .hp-bar-inner { transition: width 0.5s ease-in-out, background-color 0.5s ease-in-out; }
         .damage-text {
-            animation: damage-pop 0.8s ease-out forwards;
+            animation: damage-pop 1s ease-out forwards;
             position: absolute;
-            top: 40%;
+            top: 50%;
             left: 50%;
             transform: translateX(-50%);
             font-size: 2.5rem;
             font-weight: 900;
             color: #ef4444;
-            text-shadow: 0 0 5px white;
+            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+            pointer-events: none;
         }
         @keyframes damage-pop {
             0% { transform: translate(-50%, 0) scale(1); opacity: 1; }
@@ -103,6 +105,24 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: white;
+        }
+        .new-character-glow {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.9), 0 0 5px rgba(255, 100, 100, 1) inset;
+            border-color: #ef4444;
+        }
+        .new-tag {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: #ef4444;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 5px;
+            transform: rotate(15deg);
+            text-transform: uppercase;
+            z-index: 10;
         }
     </style>
 </head>
@@ -172,7 +192,7 @@
             { id: 10, name: "Garnet", img: "https://i.pinimg.com/736x/65/9b/d2/659bd260c80c7ecb1e2c1d7c7c3e9508.jpg", stats: { hp: 95, atk: 11, def: 9, spd: 7 }, moves: [{name: "Guanti-Razzo", power: 1.4, description: "Scaglia i suoi guanti con forza esplosiva."}, {name: "Visione Futura", power: 0, effect: 'invulnerability', effectDuration: [2, 2], uses: 3, description: "Diventa invulnerabile per 2 turni."}, {name: "Elettrocinesi", power: 1.2, description: "Scatena una scarica elettrica."}] },
             { id: 80, name: "Giyu", img: "https://i.pinimg.com/736x/fa/78/dd/fa78ddb22728f7ae661b3c18615d1d68.jpg", stats: { hp: 92, atk: 11, def: 9, spd: 10 }, moves: [{name: "Respirazione Acqua", power: 1.4, description: "Usa una delle forme della Respirazione dell'Acqua."}, {name: "Calma Piatta", power: 0, effect: 'invulnerability', effectDuration: [2, 2], uses: 3, description: "Diventa invulnerabile per 2 turni."}, {name: "Fendente Impetuoso", power: 1.5, description: "Un fendente potente e deciso."}] },
             { id: 34, name: "Grizzly", img: "https://i.pinimg.com/1200x/ac/d7/36/acd736b2bc748e58f469c0911ad42567.jpg", stats: { hp: 92, atk: 9, def: 9, spd: 7 }, moves: [{name: "Carica Potente", power: 0, damage: [10, 12], description: "Carica il nemico infliggendo 10-12 danni."}, {name: "Motivazione alle Stelle", power: 0, effect: 'infatuation', effectChance: 1.0, effectDuration: [3, 3], uses: 3, description: "Infatua il bersaglio per 3 turni."}, {name: "Orso Super-Stanco", power: 0, effect: 'heal', healAmount: [40, 40], uses: 2, description: "Cura un bersaglio di 40 HP."}] },
-            { id: 27, name: "Gumball", img: "https://i.pinimg.com/736x/af/61/0f/af610f55e819f4bd3f37e5001a2b19ee.jpg", stats: { hp: 78, atk: 8, def: 6, spd: 9 }, moves: [{name: "Potere dell'Amicizia", power: 0, damage: [25, 25], uses: 3, description: "Fa 25 di danno."}, {name: "Idea Geniale, Forse (?)", power: 0, effect: 'special_random', description: "Si cura di 18 hp, oppure, fa 12 di danno."}, {name: "Vendetta di Rob", power: 0, damage: [10, 10], description: "Fa 10 di danno."}] },
+            { id: 27, name: "Gumball", img: "https://i.pinimg.com/736x/af/61/0f/af610f55e819f4bd3f37e5001a2b19ee.jpg", stats: { hp: 78, atk: 8, def: 6, spd: 9 }, moves: [{name: "Potere dell'Amicizia", power: 0, damage: [25, 25], uses: 2, description: "Fa 25 di danno."}, {name: "Idea Geniale, Forse (?)", power: 0, effect: 'special_random', uses: 5, description: "Si cura di 18 hp, oppure, fa 12 di danno."}, {name: "Vendetta di Rob", power: 0, damage: [10, 10], description: "Fa 10 di danno."}] },
             { id: 90, name: "Homer Simpson", img: "https://i.pinimg.com/1200x/1d/b9/18/1db918fe2b5dff69f35186ad20cc1752.jpg", stats: { hp: 120, atk: 8, def: 8, spd: 3 }, moves: [{name: "D'oh!", power: 0, damage: [9, 10], description: "Si colpisce da solo, ma danneggia anche il nemico."}, {name: "Lancio di Ciambella", power: 1.0, description: "Lancia una ciambella con precisione sorprendente."}, {name: "Sonnellino Rigenerante", power: 0, effect: 'heal', healAmount: [25, 30], uses: 4, description: "Si addormenta per recuperare molti HP."}] },
             { id: 6, name: "Jake", img: "https://i.pinimg.com/736x/cb/96/5a/cb965ab6c13eaf52f182474b6fc9a7d1.jpg", stats: { hp: 95, atk: 7, def: 10, spd: 5 }, moves: [{name: "Pugno Gigante", power: 1.5, description: "Trasforma il pugno per un colpo devastante."}, {name: "Mutaforma", power: 0, effect: 'invulnerability', effectDuration: [2, 2], uses: 3, description: "Diventa invulnerabile per 2 turni."}, {name: "Scudo Corporeo", power: 0, effect: 'invulnerability', effectDuration: [2, 2], uses: 3, description: "Diventa invulnerabile per 2 turni."}] },
             { id: 82, name: "Jerry", img: "https://i.pinimg.com/736x/be/2f/e1/be2fe1bde39e5005bdc4cea479dcf6f7.jpg", stats: { hp: 65, atk: 7, def: 5, spd: 13 }, moves: [{name: "Fuga Astuta", power: 0, effect: 'invulnerability', effectDuration: [2, 2], uses: 3, description: "Diventa invulnerabile per 2 turni."}, {name: "Colpo di Formaggio", power: 0, damage: [5,5], effect: 'lifesteal', healAmount: 10, description: "Infligge 5 danni e si cura di 10 HP."}, {name: "Martello Gigante", power: 0, damage: [10,10], effect: 'stun', effectChance: 0.5, effectDuration: [1,1], description: "Infligge 10 danni e può stordire per 1 turno."}] },
@@ -250,7 +270,7 @@
             { id: 107, name: "Crash", img: "https://i.pinimg.com/736x/98/e7/25/98e7251ed569efffda255ab33c0ffb11.jpg", stats: { hp: 88, atk: 9, def: 8, spd: 11 }, isNew: true, moves: [{name: "Vortice Giravolta", power: 0, damage: [11, 13], effect: 'stun', effectChance: 0.3, effectDuration: [1, 1], description: "30% di stordire per un turno."}, {name: "Scivolata Wumpa", power: 0, damage: [8, 12], description: "Scivola sotto i nemici infliggendo da 8 a 12 danni."}, {name: "Panciata Distruttiva", power: 0, damage: [15, 15], uses: 3, description: "Infligge 15 di danno."}, {name: "Maschera Aku Aku", power: 0, effect: 'invulnerability', effectDuration: [1, 1], uses: 1, description: "Diventa invulnerabile per 1 turno."}] },
             { id: 108, name: "Mia", img: "https://i.pinimg.com/736x/f0/5b/f1/f05bf1f89011521e38e5729e6cb9596f.jpg", stats: { hp: 85, atk: 8, def: 8, spd: 9 }, isNew: true, moves: [{name: "Luce di Elvenia", power: 0, damage: [7, 9], effect: 'cleanse', description: "Infligge danno e ti cura da qualsiasi effetto di stato."}, {name: "Onchao pensaci tu!", power: 0, damage: [11, 14], description: "Onchao infligge da 11 a 14 danni al bersaglio."}, {name: "Lacrima dell'unicorno", power: 0, effect: 'heal', healAmount: [8, 14], uses: 6, description: "Si cura da 8 a 14 hp."}] },
             { id: 109, name: "Ametista", img: "https://i.pinimg.com/736x/11/b5/05/11b5056b41f87fbe3120b68ed5dcfb09.jpg", stats: { hp: 92, atk: 10, def: 10, spd: 6 }, isNew: true, moves: [{name: "Frusta gemmata", power: 0, damage: [6, 12], effect: 'burn', effectChance: 0.6, effectDuration: [3,4], effectDamage: [4,6], description: "60% di chance di bruciare il bersaglio."}, {name: "Rotolamento distruttivo", power: 0, damage: [8, 15], description: "Infligge da 8 a 15 di danno."}, {name: "Rigenerazione rapida", power: 0, effect: 'heal_percent', healPercent: 0.25, uses: 3, description: "Si cura del 25% degli HP massimi."}] },
-            { id: 110, name: "Mewtwo", img: "https://i.pinimg.com/1200x/14/58/63/145863e7d3907cda7d679130e0066014.jpg", stats: { hp: 90, atk: 13, def: 7, spd: 11 }, isNew: true, moves: [{name: "Psicobotta", power: 0, damage: [20, 20], effect: 'stun', effectDuration: [1, 1], uses: 2, description: "20 di danno, stordisce il bersaglio per 1 turno."}, {name: "Psichico", power: 0, damage: [10, 15], effect: 'stun', effectChance: 0.5, effectDuration: [1,1], description: "50% di stordire il bersaglio."}, {name: "Geloraggio", power: 0, damage: [6, 11], effect: 'freeze', effectChance: 0.5, effectDuration: [2,2], description: "50% di chance di congelare il bersaglio."}] },
+            { id: 110, name: "Mewtwo", img: "https://i.pinimg.com/1200x/14/58/63/145863e7d3907cda7d679130e0066014.jpg", stats: { hp: 90, atk: 13, def: 7, spd: 11 }, isNew: true, moves: [{name: "Psicobotta", power: 0, damage: [20, 20], effect: 'stun', effectDuration: [1, 1], uses: 2, description: "20 di danno, stordisce il bersaglio per 1 turno."}, {name: "Psichico", power: 0, damage: [10, 15], effect: 'stun', effectChance: 0.3, effectDuration: [1,1], description: "30% di stordire il bersaglio."}, {name: "Geloraggio", power: 0, damage: [6, 11], effect: 'freeze', effectChance: 0.5, effectDuration: [2,2], description: "50% di chance di congelare il bersaglio."}] },
         ];
 
         // Ordina il roster alfabeticamente
@@ -350,9 +370,13 @@
         }
         
         async function selectCharacter(characterId) {
-            const { draftState, players } = globalState.gameData;
+            const { draftState, players, hostId } = globalState.gameData;
             const currentPlayerId = draftState.playerOrder[draftState.currentPlayerIndex];
-            if (globalState.userId !== currentPlayerId && !players[currentPlayerId].isCPU) return;
+            const isHost = globalState.userId === hostId;
+
+            // Allow pick if it's the player's turn, OR if it's a CPU's turn and the user is the host
+            if (globalState.userId !== currentPlayerId && !(players[currentPlayerId].isCPU && isHost)) return;
+            
             if (!draftState.availableCharacterIds.includes(characterId)) return;
             globalState.isLoading = true; render();
             const gameRef = doc(db, `artifacts/${appId}/public/data/battaglia-royale`, globalState.gameId);
@@ -373,22 +397,6 @@
             } catch(e) {
                 console.error("Errore nella selezione:", e);
                 globalState.isLoading = false; render();
-            }
-        }
-        
-        function handleCPUTurn() {
-            const { draftState, players } = globalState.gameData;
-            if (!draftState) return;
-            const currentPlayerId = draftState.playerOrder[draftState.currentPlayerIndex];
-            const currentPlayer = players[currentPlayerId];
-            if (currentPlayer && currentPlayer.isCPU) {
-                setTimeout(() => {
-                    const availableIds = draftState.availableCharacterIds;
-                    if (availableIds.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * availableIds.length);
-                        selectCharacter(availableIds[randomIndex]);
-                    }
-                }, 1500);
             }
         }
         
@@ -453,9 +461,6 @@
                     globalState.isLoading = false;
                     const newStatus = globalState.gameData.status;
                     globalState.currentScreen = newStatus === 'waiting' ? 'lobby' : newStatus;
-                    
-                    if (newStatus === 'drafting' && oldData?.status !== 'drafting') handleCPUTurn();
-                    else if (newStatus === 'drafting' && oldData?.draftState?.currentPlayerIndex !== globalState.gameData.draftState.currentPlayerIndex) handleCPUTurn();
                     
                     if (newStatus === 'naming' && oldData?.status !== 'naming') {
                         if (globalState.userId === globalState.gameData.hostId) handleCPUNaming();
@@ -863,7 +868,12 @@
                         type: moveEffect,
                         duration: Math.floor(Math.random() * (params.duration[1] - params.duration[0] + 1)) + params.duration[0],
                     };
-                    if (params.damage) newStatus.damage = params.damage;
+                    if (params.damage) {
+                        newStatus.damage = params.damage;
+                    } else if (['poison', 'burn', 'vortex'].includes(moveEffect)) {
+                        // Fallback for random_status moves that don't define their own damage
+                        newStatus.damage = statusParams[moveEffect].damage;
+                    }
                     
                     if (isAttackerP1) rpgBattle.p2_status = newStatus;
                     else rpgBattle.p1_status = newStatus;
@@ -1001,27 +1011,12 @@
         function renderMenuScreen() { return `<div class="w-full max-w-md mx-auto text-center"><h1 class="text-6xl font-black text-white mb-2">BATTAGLIA<span class="text-blue-400">ROYALE</span></h1><p class="text-gray-300 mb-10">Ciao, <span class="font-bold text-blue-400">${globalState.nickname}</span>! Cosa vuoi fare?</p><div class="space-y-4"><button id="create-game-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-4 rounded-lg text-xl btn-glow">Crea Stanza</button><div class="flex space-x-4"><input type="text" id="join-code-input" class="flex-grow bg-gray-700 border-2 border-gray-600 rounded-lg p-3 text-center focus:outline-none focus:border-blue-500" placeholder="CODICE STANZA"><button id="join-game-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg btn-glow">Unisciti</button></div><button id="find-game-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-4 rounded-lg text-lg btn-glow" disabled>Cerca Stanza (Prossimamente)</button></div></div>`; }
         function renderConfigScreen() { const { config } = globalState.gameData; return `<div class="w-full max-w-2xl mx-auto bg-gray-800 p-8 rounded-xl shadow-2xl"><h2 class="text-3xl font-bold text-center mb-6">Configurazione Partita</h2><div class="space-y-6"><div><label class="block text-lg font-medium text-gray-300 mb-2">Numero di Team: <span class="font-bold text-blue-400">${config.numTeams}</span></label><input id="num-teams-slider" type="range" min="2" max="8" value="${config.numTeams}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"></div><div><label class="block text-lg font-medium text-gray-300 mb-2">Membri per Team: <span class="font-bold text-blue-400">${config.membersPerTeam}</span></label><input id="members-per-team-slider" type="range" min="4" max="10" value="${config.membersPerTeam}" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"></div></div><div class="mt-8 text-center"><button id="confirm-config-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg btn-glow">Vai alla Lobby</button></div></div>`; }
         function renderLobbyScreen() { const { players, config, hostId } = globalState.gameData; const isHost = globalState.userId === hostId; const canStart = Object.keys(players).length >= 2 && Object.keys(players).length === config.numTeams; let html = `<div class="w-full max-w-4xl mx-auto bg-gray-800 p-8 rounded-xl shadow-2xl"><h2 class="text-3xl font-bold text-center mb-2">Lobby di Gioco</h2><p class="text-center text-gray-400 mb-6">Codice Stanza: <span id="room-code" class="font-bold text-2xl text-yellow-400 tracking-widest cursor-pointer" title="Copia codice">${globalState.gameId}</span></p><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">`; for (let i = 0; i < config.numTeams; i++) { const playerId = Object.keys(players)[i]; const player = players[playerId]; if (player) { html += `<div class="bg-gray-700 p-4 rounded-lg text-center ${playerId === hostId ? 'border-2 border-yellow-400' : ''}"><p class="text-xl font-bold truncate">${player.nickname}</p><p class="text-sm ${player.isCPU ? 'text-cyan-400' : 'text-green-400'}">${player.isCPU ? 'CPU' : 'Giocatore'}</p></div>`; } else { html += `<div class="bg-gray-900 border-2 border-dashed border-gray-600 p-4 rounded-lg text-center text-gray-500 flex items-center justify-center"><p>In attesa...</p></div>`; } } html += `</div><div class="flex flex-col md:flex-row justify-between items-center mt-8"><button id="leave-game-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg text-lg mb-4 md:mb-0">Abbandona Stanza</button>${isHost ? `<div class="flex items-center space-x-4"><button id="add-cpu-btn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-6 rounded-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed" ${Object.keys(players).length >= config.numTeams ? 'disabled' : ''}>Aggiungi CPU</button><button id="start-game-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg disabled:opacity-50 disabled:cursor-not-allowed" ${!canStart ? 'disabled' : ''}>Inizia Partita</button></div>` : '<p class="text-lg">In attesa che l\'host inizi la partita...</p>'}</div></div>`; return html; }
-        function renderDraftScreen() { const { draftState, players, config } = globalState.gameData; if (!draftState) return renderLoading(); const currentPlayerId = draftState.playerOrder[draftState.currentPlayerIndex]; const currentPlayer = players[currentPlayerId]; const isMyTurn = currentPlayerId === globalState.userId; const picksPerPlayer = players[globalState.userId]?.characters.length || 0; let html = `<style>
-                .new-character-glow {
-                    box-shadow: 0 0 15px rgba(239, 68, 68, 0.9), 0 0 5px rgba(255, 100, 100, 1) inset;
-                    border-color: #ef4444;
-                }
-                .new-tag {
-                    position: absolute;
-                    top: -5px;
-                    right: -5px;
-                    background-color: #ef4444;
-                    color: white;
-                    font-size: 0.6rem;
-                    font-weight: bold;
-                    padding: 2px 5px;
-                    border-radius: 5px;
-                    transform: rotate(15deg);
-                    text-transform: uppercase;
-                    z-index: 10;
-                }
-            </style>
-            <div class="w-full max-w-7xl mx-auto flex flex-col h-screen"><div class="p-4 bg-gray-800 rounded-t-xl shadow-lg"><h1 class="text-3xl font-black text-center">SELEZIONE PERSONAGGI</h1><p class="text-center text-lg text-yellow-400 mt-2">Turno di: <span class="font-bold text-white">${currentPlayer.nickname}</span> ${isMyTurn ? '(Tocca a te!)' : ''}</p><p class="text-center text-gray-400">Selezione ${draftState.picksMade + 1} di ${draftState.totalPicks}</p></div><div class="flex-grow overflow-y-auto p-4 bg-gray-800 bg-opacity-50"><div class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">`; charactersDB.forEach(char => { const isTaken = !draftState.availableCharacterIds.includes(char.id); const canSelect = isMyTurn && !isTaken && !currentPlayer.isCPU; const isNew = char.isNew || false; html += `<div data-character-id="${char.id}" class="character-card relative ${isTaken ? 'taken' : ''} ${canSelect ? 'selectable cursor-pointer' : ''} ${isNew ? 'new-character-glow' : ''}"><img src="${char.img}" alt="${char.name}" class="w-full h-auto rounded-md aspect-square object-cover" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/100x100/1f2937/9ca3af?text=?';"> ${isNew ? '<div class="new-tag">Nuovo!</div>' : ''} <p class="text-xs text-center mt-1 truncate p-1 bg-black bg-opacity-50 rounded-b-md">${char.name}</p></div>`; }); html += `</div></div><div class="p-4 bg-gray-800 rounded-b-xl shadow-lg"><h3 class="text-lg font-bold text-center">Il tuo Team (${picksPerPlayer}/${config.membersPerTeam})</h3><div class="flex justify-center items-center space-x-2 mt-2 min-h-[60px]">`; const myTeamChars = players[globalState.userId].characters; if (myTeamChars.length > 0) { myTeamChars.forEach(charObj => { const charData = charactersDB.find(c => c.id === charObj.id); html += `<img src="${charData.img}" title="${charData.name}" class="w-12 h-12 rounded-full border-2 border-blue-400 object-cover">`; }); } else { html += `<p class="text-gray-500">Nessun personaggio selezionato.</p>`; } html += `</div></div></div>`; return html; }
+        function renderDraftScreen() { const { draftState, players, config, hostId } = globalState.gameData; if (!draftState) return renderLoading(); const currentPlayerId = draftState.playerOrder[draftState.currentPlayerIndex]; const currentPlayer = players[currentPlayerId]; const isMyTurn = currentPlayerId === globalState.userId; const isHost = globalState.userId === hostId; const canPickRandom = isMyTurn || (isHost && currentPlayer.isCPU); const picksPerPlayer = players[globalState.userId]?.characters.length || 0; let html = `<div class="w-full max-w-7xl mx-auto flex flex-col h-screen"><div class="p-4 bg-gray-800 rounded-t-xl shadow-lg">
+            <div class="flex justify-center items-center relative mb-2">
+                <h1 class="text-3xl font-black text-center">SELEZIONE PERSONAGGI</h1>
+                <button id="random-pick-btn" class="absolute right-0 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg btn-glow disabled:opacity-50 disabled:cursor-not-allowed" ${!canPickRandom ? 'disabled' : ''}>Scelta Casuale</button>
+            </div>
+            <p class="text-center text-lg text-yellow-400 mt-2">Turno di: <span class="font-bold text-white">${currentPlayer.nickname}</span> ${isMyTurn ? '(Tocca a te!)' : ''}</p><p class="text-center text-gray-400">Selezione ${draftState.picksMade + 1} di ${draftState.totalPicks}</p></div><div class="flex-grow overflow-y-auto p-4 bg-gray-800 bg-opacity-50"><div class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">`; charactersDB.forEach(char => { const isTaken = !draftState.availableCharacterIds.includes(char.id); const canSelect = isMyTurn || (isHost && currentPlayer.isCPU); const selectableClass = canSelect && !isTaken ? 'selectable cursor-pointer' : ''; const isNew = char.isNew || false; html += `<div data-character-id="${char.id}" class="character-card relative ${isTaken ? 'taken' : ''} ${selectableClass} ${isNew ? 'new-character-glow' : ''}"><img src="${char.img}" alt="${char.name}" class="w-full h-auto rounded-md aspect-square object-cover" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/100x100/1f2937/9ca3af?text=?';"> ${isNew ? '<div class="new-tag">Nuovo!</div>' : ''} <p class="text-xs text-center mt-1 truncate p-1 bg-black bg-opacity-50 rounded-b-md">${char.name}</p></div>`; }); html += `</div></div><div class="p-4 bg-gray-800 rounded-b-xl shadow-lg"><h3 class="text-lg font-bold text-center">Il tuo Team (${picksPerPlayer}/${config.membersPerTeam})</h3><div class="flex justify-center items-center space-x-2 mt-2 min-h-[60px]">`; const myTeamChars = players[globalState.userId].characters; if (myTeamChars.length > 0) { myTeamChars.forEach(charObj => { const charData = charactersDB.find(c => c.id === charObj.id); html += `<img src="${charData.img}" title="${charData.name}" class="w-12 h-12 rounded-full border-2 border-blue-400 object-cover">`; }); } else { html += `<p class="text-gray-500">Nessun personaggio selezionato.</p>`; } html += `</div></div></div>`; return html; }
         function renderNamingScreen() { const myPlayer = globalState.gameData.players[globalState.userId]; if (!myPlayer) return renderLoading(); if (myPlayer.ready) { return `<div class="text-center"><h1 class="text-3xl font-bold">In attesa degli altri giocatori...</h1><svg class="animate-spin h-8 w-8 text-white mx-auto mt-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>`; } const usedColors = Object.values(globalState.gameData.players).map(p => p.teamColor).filter(Boolean); return `<div class="w-full max-w-2xl mx-auto bg-gray-800 p-8 rounded-xl shadow-2xl text-center"><h1 class="text-4xl font-bold">Crea il tuo Team</h1><p class="text-xl mt-2 text-gray-400">Dai un nome e un colore alla tua squadra.</p><div class="mt-8"><label for="team-name-input" class="text-lg font-medium">Nome del Team</label><input type="text" id="team-name-input" class="w-full bg-gray-700 border-2 border-gray-600 rounded-lg p-3 text-center text-lg focus:outline-none focus:border-blue-500 mt-2" placeholder="Nome epico..." maxlength="20"></div><div class="mt-6"><label class="text-lg font-medium">Colore del Team</label><div class="grid grid-cols-8 gap-2 mt-2"> ${teamColors.map(color => { const isTaken = usedColors.includes(color.hex) && myPlayer.teamColor !== color.hex; return `<div data-color="${color.hex}" class="color-swatch w-full h-12 rounded-lg cursor-pointer ${isTaken ? 'taken' : ''}" style="background-color: ${color.hex};"></div>`; }).join('')}</div></div><button id="confirm-team-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg mt-8 text-lg btn-glow disabled:opacity-50" disabled>Sono Pronto</button></div>`; }
         function renderArenaScreen() {
             const { players, arenaState } = globalState.gameData;
@@ -1237,6 +1232,25 @@
 
 
         // --- GESTIONE EVENTI ---
+        function handleRandomPick() {
+            const { draftState, players, hostId } = globalState.gameData;
+            if (!draftState) return;
+
+            const currentPlayerId = draftState.playerOrder[draftState.currentPlayerIndex];
+            const currentPlayer = players[currentPlayerId];
+            const isMyTurn = currentPlayerId === globalState.userId;
+            const isHost = globalState.userId === hostId;
+
+            if (isMyTurn || (isHost && currentPlayer.isCPU)) {
+                const availableIds = draftState.availableCharacterIds;
+                if (availableIds.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * availableIds.length);
+                    const randomCharId = availableIds[randomIndex];
+                    selectCharacter(randomCharId);
+                }
+            }
+        }
+        
         function attachEventListeners() {
             document.getElementById('nickname-form')?.addEventListener('submit', (e) => { e.preventDefault(); const nickname = document.getElementById('nickname-input').value.trim(); if (nickname) { globalState.nickname = nickname; localStorage.setItem('battagliaRoyaleNickname', nickname); globalState.currentScreen = 'menu'; render(); } });
             document.getElementById('create-game-btn')?.addEventListener('click', createGame);
@@ -1249,7 +1263,10 @@
             document.getElementById('start-game-btn')?.addEventListener('click', initializeDraft);
             document.getElementById('room-code')?.addEventListener('click', (e) => { navigator.clipboard.writeText(e.target.innerText).then(() => { globalState.error = "Codice copiato!"; render(); }); });
 
-            if (globalState.currentScreen === 'drafting') { document.querySelectorAll('.character-card.selectable').forEach(card => { card.addEventListener('click', () => { const charId = parseInt(card.dataset.characterId); selectCharacter(charId); }); }); }
+            if (globalState.currentScreen === 'drafting') { 
+                document.querySelectorAll('.character-card.selectable').forEach(card => { card.addEventListener('click', () => { const charId = parseInt(card.dataset.characterId); selectCharacter(charId); }); });
+                document.getElementById('random-pick-btn')?.addEventListener('click', handleRandomPick);
+            }
             if (globalState.currentScreen === 'naming' && !globalState.gameData.players[globalState.userId].ready) {
                 const nameInput = document.getElementById('team-name-input');
                 const confirmBtn = document.getElementById('confirm-team-btn');
